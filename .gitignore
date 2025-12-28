@@ -1,0 +1,14 @@
+# VSCode
+.vscode/
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Логи и временные
+*.log
+.env
+
+# OS
+*.swp
+*.swo

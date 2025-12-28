@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NeonSnake — Smoke Tests</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 20px;
+      background: #081026;
+      color: #cfefff
+    }
+
+    button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin: 6px;
+      background: #00f5ff;
+      color: #081026;
+      border: none;
+      cursor: pointer
+    }
+  </style>
+</head>
+
+<body>
+  <h1>NeonSnake — Smoke Tests</h1>
+  <p>Нажмите <strong>Run tests</strong>, откройте DevTools (Console) и смотрите лог результатов. Эти тесты проверяют
+    звук/громкость и сериализацию в localStorage.</p>
+  <button id="runBtn">Run tests</button>
+  <pre id="log"
+    style="background:#021428;padding:12px;border-radius:8px;color:#bfefff;height:300px;overflow:auto"></pre>
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+
+    document.getElementById('runBtn').addEventListener('click', async () => {
+      log('Starting smoke tests...');
+
+      try {
+        // setup known settings before loading soundManager
+        localStorage.setItem('appSettings', JSON.stringify({ sound: true, volume: 0.5, showArrows: true, vibration: true }));
+        log('Wrote appSettings with volume=0.5');
+
+        // load soundManager
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = '/js/soundManager.js';
+          s.onload = res; s.onerror = rej;
+          document.body.appendChild(s);
+        });
+        log('Loaded soundManager.js');
+
+        // check initial volume
+        const vol = window.soundManager?.getVolume?.();
+        log('soundManager.getVolume() -> ' + vol);
+        if (Math.abs(vol - 0.5) < 0.01) log('PASS: initial volume applied'); else log('WARN: initial volume mismatch');
+
+        // play quick sound (may require gesture in some browsers)
+        try {
+          window.soundManager.play('click');
+          log('PLAY: click invoked (no exception)');
+        } catch (e) {
+          log('FAIL: soundManager.play threw: ' + e);
+        }
+
+        // change volume
+        window.soundManager.setVolume(0.2);
+        log('Set volume to 0.2, readback: ' + window.soundManager.getVolume());
+
+        // disable sound and ensure play is no-op
+        const app = JSON.parse(localStorage.getItem('appSettings') || '{}');
+        app.sound = false; localStorage.setItem('appSettings', JSON.stringify(app));
+        window.appSettings = app;
+        try { window.soundManager.play('eat'); log('PLAY: eat invoked while sound disabled (no exception)'); } catch (e) { log('FAIL: play threw when sound disabled: ' + e); }
+
+        log('Smoke tests finished. Manually verify audible cues and that no errors occurred in Console.');
+      } catch (err) {
+        log('TEST ERROR: ' + err);
+      }
+    });
+  </script>
+</body>
+
+</html>
