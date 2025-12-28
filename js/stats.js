@@ -483,9 +483,37 @@ const renderPersonalStats = async (container) => {
 
     let guestNotice = '';
     if (!getTelegramUser()) {
-        guestNotice = `<p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
-      📱 Play in Telegram for full sync
-    </p>`;
+        const telegramUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+        guestNotice = `
+            <p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
+                📱 Play in Telegram for full sync
+            </p>
+            <a 
+                href="${telegramUrl}" 
+                target="_blank"
+                style="
+                    display: inline-block;
+                    margin-top: 10px;
+                    padding: 8px 16px;
+                    font-family: 'Orbitron', sans-serif;
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: var(--neon-blue);
+                    background: transparent;
+                    border: 2px solid var(--neon-blue);
+                    border-radius: 6px;
+                    text-decoration: none;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+                    transition: all 0.3s ease;
+                "
+                onmouseover="this.style.boxShadow='0 0 14px rgba(0, 255, 255, 0.8)'; this.style.transform='scale(1.05)';"
+                onmouseout="this.style.boxShadow='0 0 8px rgba(0, 255, 255, 0.5)'; this.style.transform='scale(1)';"
+            >
+                Open in Telegram
+            </a>
+        `;
     }
 
     container.innerHTML = `
