@@ -88,58 +88,55 @@ const MIN_SAVE_INTERVAL = 5000;
 // === Загрузка лидерборда: API → CloudStorage → localStorage ===
 const loadLeaderboard = async () => {
     const now = Date.now();
-    if (cachedLeaderboard && now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL) {
+    if (cachedLeaderboard && (now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL)) {
         return cachedLeaderboard;
     }
 
     let leaderboard = [];
 
-    // 1. API
+    // 1. Попытка загрузить из API - ИЗМЕНЕНО ЗДЕСЬ
     try {
-        const res = await fetch(`${API_URL}/leaderboard`);
+        const res = await fetch(`${API_URL}/api/leaderboard`);  // ИЗМЕНЕНО
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
-                console.log('✅ Leaderboard from API');
+                console.log('Leaderboard from API');
             }
         }
     } catch (e) {
-        console.warn('⚠️ API failed → fallback to CloudStorage', e);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar("Using local stats", "info");
-        }
+        console.warn('API failed, fallback to CloudStorage', e);
+        if (typeof showSnackbar === 'function') showSnackbar('Using local stats', 'info');
     }
 
-    // 2. CloudStorage
+    // 2. CloudStorage fallback
     if (leaderboard.length === 0) {
         try {
             const data = await loadFromCloudWithTimeout('leaderboard');
             const parsed = safeParse(data);
             if (Array.isArray(parsed)) {
                 leaderboard = parsed;
-                console.log('✅ Leaderboard from CloudStorage');
+                console.log('Leaderboard from CloudStorage');
             }
         } catch (e) {
-            console.warn('⚠️ CloudStorage failed → fallback to localStorage', e);
+            console.warn('CloudStorage failed, fallback to localStorage', e);
         }
     }
 
-    // 3. localStorage
+    // 3. localStorage fallback
     if (leaderboard.length === 0) {
         try {
             const saved = localStorage.getItem('snakeLeaderboard');
             const parsed = safeParse(saved);
             if (Array.isArray(parsed)) {
                 leaderboard = parsed;
-                console.log('✅ Leaderboard from localStorage');
+                console.log('Leaderboard from localStorage');
             }
         } catch (e) {
-            console.warn('⚠️ localStorage failed', e);
+            console.warn('localStorage failed', e);
         }
     }
 
-    // Сортируем и кэшируем
     const sorted = Array.isArray(leaderboard)
         ? leaderboard
             .sort((a, b) => b.score - a.score)
@@ -148,11 +145,10 @@ const loadLeaderboard = async () => {
 
     cachedLeaderboard = sorted;
     cachedLeaderboardTimestamp = now;
-
     return sorted;
 };
 
-// === Загрузка личной статистики: CloudStorage → localStorage ===
+// === Загрузка личной статистики: API → CloudStorage → localStorage ===
 const loadPersonalStats = async () => {
     if (!APP_USER_ID) return null;
 
@@ -163,22 +159,43 @@ const loadPersonalStats = async () => {
 
     let stats = null;
 
-    // 1. CloudStorage
+    // 1. Попытка загрузить из API
     try {
-        const data = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
-        const parsed = safeParse(data);
-        if (parsed && typeof parsed.highScore !== 'undefined') {
-            stats = parsed;
-            console.log('✅ Personal stats from CloudStorage');
+        const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data.score !== 'undefined') {
+                stats = {
+                    highScore: data.score || 0,
+                    totalGames: data.totalGames || 0,
+                    totalScore: data.totalScore || 0,
+                    lastUpdated: data.timestamp || Date.now()
+                };
+                console.log('✅ Personal stats from API');
+            }
         }
     } catch (e) {
-        console.warn('⚠️ CloudStorage stats failed → fallback to localStorage', e);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar("Local stats loaded", "info");
+        console.warn('⚠️ API stats failed → fallback to CloudStorage', e);
+    }
+
+    // 2. CloudStorage fallback
+    if (!stats) {
+        try {
+            const data = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
+            const parsed = safeParse(data);
+            if (parsed && typeof parsed.highScore !== 'undefined') {
+                stats = parsed;
+                console.log('✅ Personal stats from CloudStorage');
+            }
+        } catch (e) {
+            console.warn('⚠️ CloudStorage stats failed → fallback to localStorage', e);
+            if (typeof showSnackbar === 'function') {
+                showSnackbar("Local stats loaded", "info");
+            }
         }
     }
 
-    // 2. localStorage
+    // 3. localStorage fallback
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
@@ -186,7 +203,12 @@ const loadPersonalStats = async () => {
             const totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
 
             if (highScore > 0 || totalGames > 0 || totalScore > 0) {
-                stats = { highScore, totalGames, totalScore, lastUpdated: Date.now() };
+                stats = {
+                    highScore,
+                    totalGames,
+                    totalScore,
+                    lastUpdated: Date.now()
+                };
                 console.log('✅ Personal stats from localStorage');
             }
         } catch (e) {
@@ -196,37 +218,34 @@ const loadPersonalStats = async () => {
 
     cachedPersonalStats = stats;
     cachedPersonalStatsTimestamp = now;
-
     return stats;
 };
 
+
 // === Сохранение в лидерборд с защитой ===
 const saveScoreToLeaderboard = async (score, level) => {
-    if (!APP_USER_ID || !APP_USER_NAME) {
-        if (typeof showSnackbar === 'function') {
-            showSnackbar("Guest: can't save", "info");
-        }
+    if (!APP_USER_ID || !APP_USERNAME) {
+        if (typeof showSnackbar === 'function') showSnackbar('Guest can\'t save', 'info');
         return;
     }
 
     const now = Date.now();
     if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
-        console.warn('🚫 Too fast! Wait...');
+        console.warn('Too fast! Wait...');
         return;
     }
 
     const userData = {
         userId: APP_USER_ID,
-        name: APP_USER_NAME,
+        name: APP_USERNAME,
         score,
         level,
         timestamp: now,
         hash: safeBtoa(`${APP_USER_ID}:${score}:${level}:${now}`).substr(0, 20)
     };
 
-    // Попытка отправить на API
     try {
-        const res = await fetch(`${API_URL}/score`, {
+        const res = await fetch(`${API_URL}/api/score`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
@@ -235,18 +254,16 @@ const saveScoreToLeaderboard = async (score, level) => {
         if (res.ok) {
             cachedLeaderboard = null;
             lastSaveTime = now;
-            if (typeof showSnackbar === 'function') {
-                showSnackbar(`Score saved: ${score}!`, "success");
-            }
+            if (typeof showSnackbar === 'function') showSnackbar(`Score saved: ${score}!`, 'success');
         } else {
             throw new Error('API rejected');
         }
     } catch (e) {
-        console.warn('⚠️ API failed → saving locally');
+        console.warn('API failed, saving locally', e);
         await fallbackSaveToStorage(userData);
     }
 
-    // Обновить лидерборд в UI, если открыт
+    // UI refresh
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
@@ -371,51 +388,72 @@ const renderLeaderboard = (leaderboard, container) => {
 
 // === Рендер личной статистики ===
 const renderPersonalStats = async (container) => {
-    if (!container) return;
+  if (!container) return;
 
-    const stats = await loadPersonalStats();
+  let stats = null;
+  let highScore = 0;
+  let totalGames = 0;
+  let totalScore = 0;
+  let avgScore = 0;
 
-    const highScore = stats?.highScore || 0;
-    const totalGames = stats?.totalGames || 0;
-    const totalScore = stats?.totalScore || 0;
-    const avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
-
-    let guestNotice = '';
-    if (!getTelegramUser()) {
-        guestNotice = `
-            <p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
-                📱 Play in Telegram for full sync
-            </p>
-        `;
+  // Для авторизованных пользователей загружаем из облака/API
+  if (APP_USER_ID) {
+    stats = await loadPersonalStats();
+    if (stats) {
+      highScore = stats.highScore || 0;
+      totalGames = stats.totalGames || 0;
+      totalScore = stats.totalScore || 0;
     }
+  }
 
-    container.innerHTML = `
-        <div class="stats-info">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-item-label">Best Score</div>
-                    <div class="stat-item-value">${highScore.toLocaleString()}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-item-label">Total Games</div>
-                    <div class="stat-item-value">${totalGames}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-item-label">Total Score</div>
-                    <div class="stat-item-value">${totalScore.toLocaleString()}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-item-label">Avg Score</div>
-                    <div class="stat-item-value">${avgScore.toLocaleString()}</div>
-                </div>
-            </div>
+  // Для гостей или если не удалось загрузить - берем из localStorage
+  if (!stats) {
+    try {
+      highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+      totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
+      totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
+      console.log('📊 Guest stats from localStorage:', { highScore, totalGames, totalScore });
+    } catch (e) {
+      console.warn('⚠️ Failed to load guest stats from localStorage', e);
+    }
+  }
+
+  avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
+
+  let guestNotice = '';
+  if (!getTelegramUser()) {
+    guestNotice = `<p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
+      📱 Play in Telegram for full sync
+    </p>`;
+  }
+
+  container.innerHTML = `
+    <div class="stats-info">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-item-label">Best Score</div>
+          <div class="stat-item-value">${highScore.toLocaleString()}</div>
         </div>
-        <div style="text-align: center; padding: 20px; color: var(--neon-purple); font-size: 14px;">
-            <p style="margin-bottom: 5px;">👤 ${APP_USER_NAME}</p>
-            <p style="opacity: 0.7;">Keep playing to climb the ranks!</p>
-            ${guestNotice}
+        <div class="stat-item">
+          <div class="stat-item-label">Total Games</div>
+          <div class="stat-item-value">${totalGames}</div>
         </div>
-    `;
+        <div class="stat-item">
+          <div class="stat-item-label">Total Score</div>
+          <div class="stat-item-value">${totalScore.toLocaleString()}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item-label">Avg Score</div>
+          <div class="stat-item-value">${avgScore.toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="text-align: center; padding: 20px; color: var(--neon-purple); font-size: 14px;">
+        <p style="margin-bottom: 5px;">👤 ${APP_USER_NAME}</p>
+        <p style="opacity: 0.7;">Keep playing to climb the ranks!</p>
+        ${guestNotice}
+      </div>
+    </div>
+  `;
 };
 
 // === UI: открытие / переключение ===

@@ -315,7 +315,6 @@ const gameOver = () => {
     isGameRunning = false;
     isPaused = false;
     clearInterval(gameLoop);
-
     document.getElementById('pauseBtn').classList.remove('show');
 
     totalGames++;
@@ -323,24 +322,30 @@ const gameOver = () => {
 
     if (score > highScore) {
         highScore = score;
-        localStorage.setItem('snakeHighScore', highScore);
-
-        // Сохраняем в облако как рекорд
-        if (typeof savePersonalStats === 'function') {
-            savePersonalStats({ highScore, totalGames, totalScore });
-        }
     }
 
+    // Сохраняем в localStorage ВСЕГДА (и для гостей, и для авторизованных)
+    localStorage.setItem('snakeHighScore', highScore);
     localStorage.setItem('totalGames', totalGames);
     localStorage.setItem('totalScore', totalScore);
 
+    console.log('💾 Stats saved to localStorage:', { highScore, totalGames, totalScore });
+
+    // Для авторизованных пользователей сохраняем в облако
+    if (typeof savePersonalStats === 'function' && APP_USER_ID) {
+        savePersonalStats({ highScore, totalGames, totalScore });
+    }
+
+    // Отправка результата в лидерборд (только для авторизованных)
     if (typeof saveScoreToLeaderboard === 'function') {
         saveScoreToLeaderboard(score, level);
     } else {
         console.warn('saveScoreToLeaderboard is not available');
     }
 
+    // Остальной код...
     document.getElementById('finalScore').textContent = score;
+
     const levelUpNotice = document.getElementById('levelUpNotice');
     if (level > 1) {
         levelUpNotice.textContent = `⚡ Reached Level ${level}!`;
@@ -348,6 +353,7 @@ const gameOver = () => {
     } else {
         levelUpNotice.style.display = 'none';
     }
+
     document.getElementById('gameOver').classList.add('show');
 
     if (window.soundManager) window.soundManager.play('gameover');
@@ -389,8 +395,8 @@ const togglePause = () => {
 };
 
 const quitGame = () => {
-    const confirmed = window.Telegram?.WebApp?.confirm
-        ? window.Telegram.WebApp.confirm('Are you sure you want to quit and close the game?')
+    const confirmed = tg?.confirm
+        ? tg.confirm('Are you sure you want to quit and close the game?')
         : confirm('Quit and close the app?');
 
     if (!confirmed) return;
@@ -399,50 +405,80 @@ const quitGame = () => {
     document.getElementById('pauseScreen').classList.remove('show');
 
     setTimeout(() => {
-        if (window.Telegram?.WebApp?.close) {
-            window.Telegram.WebApp.close();
+        if (tg?.close) {
+            tg.close();
         }
     }, 300);
 };
 
 // === Share result ===
 const shareScore = () => {
-    const userName = getUserName(); // из stats.js
-    const isRecord = score >= highScore;
+  const isRecord = score >= highScore;
+  
+  // Формируем сообщение
+  let message = `🎮 I just played Neon Snake!\n\n`;
+  message += `🎯 Score: ${score.toLocaleString()}\n`;
+  message += `⚡ Level: ${level}\n`;
+  
+  if (isRecord) {
+    message += `\n🏆 NEW PERSONAL RECORD! 🎉\n`;
+  }
+  
+  message += `\nCan you beat me? Try it now!`;
 
-    let message = `🎮 I just played *Neon Snake*!\n\n`;
-    message += `🎯 Score: *${score.toLocaleString()}*\n`;
-    message += `⚡ Level: *${level}*\n`;
-    if (isRecord) {
-        message += `🏆 NEW PERSONAL RECORD! 🎉\n`;
+  try {
+    // 1. Попытка использовать Telegram WebApp share (внутри Telegram)
+    if (tg?.share) {
+      tg.share(message);
+    } 
+    // 2. Fallback: открыть диалог шаринга через t.me ссылку
+    else {
+      const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+      const encodedMessage = encodeURIComponent(message + '\n\n' + gameUrl);
+      const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(gameUrl)}&text=${encodedMessage}`;
+      
+      // Открываем в новом окне
+      window.open(telegramShareUrl, '_blank');
+      
+      if (typeof showSnackbar === 'function') {
+        showSnackbar("Opening Telegram share...", "info");
+      }
     }
-    message += `\nCan you beat me? Try it now!`;
+  } catch (e) {
+    console.error('Share failed', e);
+    
+    // Последний fallback: копируем в буфер
+    const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+    const fullMessage = message + '\n\n' + gameUrl;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(fullMessage)
+        .then(() => {
+          if (typeof showSnackbar === 'function') {
+            showSnackbar("Message copied! Share it in Telegram", "info");
+          }
+        })
+        .catch(() => {
+          if (typeof showSnackbar === 'function') {
+            showSnackbar("Share failed", "error");
+          }
+        });
+    }
+  }
 
-    try {
-        // Попытка использовать Telegram WebApp share
-        if (window.Telegram?.WebApp?.share) {
-            window.Telegram.WebApp.share(message);
-        } else {
-            // Fallback: копируем в буфер
-            navigator.clipboard.writeText(message).then(() => {
-                showSnackbar("Score copied to clipboard!", "info");
-            }).catch(() => {
-                showSnackbar("Sharing not supported", "error");
-            });
-        }
-    } catch (e) {
-        console.error('Share failed', e);
-        showSnackbar("Share failed", "error");
-    }
+  // Haptic & sound feedback
+  if (window.appSettings?.vibration && tg?.HapticFeedback) {
+    tg.HapticFeedback.impactOccurred('medium');
+  }
 
-    // Haptic & sound feedback
-    if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-    }
-    if (window.soundManager) {
-        window.soundManager.play('click');
-    }
+  if (window.soundManager) {
+    window.soundManager.play('click');
+  }
 };
+
+document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
+  shareScore();
+});
 
 document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
     shareScore();
@@ -452,7 +488,7 @@ document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
 updateUI();
 
 const updateSafeArea = () => {
-    const insets = window.Telegram?.WebApp?.safeAreaInsets || { top: 0, bottom: 0, left: 0, right: 0 };
+    const insets = tg?.safeAreaInsets || { top: 0, bottom: 0, left: 0, right: 0 };
     document.documentElement.style.setProperty('--safe-area-top', `${insets.top}px`);
     document.documentElement.style.setProperty('--safe-area-bottom', `${insets.bottom}px`);
     document.documentElement.style.setProperty('--safe-area-left', `${insets.left}px`);
