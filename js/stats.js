@@ -94,19 +94,38 @@ const loadLeaderboard = async () => {
 
     let leaderboard = [];
 
-    // 1. Попытка загрузить из API - ИЗМЕНЕНО ЗДЕСЬ
+    // 1. Попытка загрузить из API
     try {
-        const res = await fetch(`${API_URL}/api/leaderboard`);  // ИЗМЕНЕНО
+        const res = await fetch(`${API_URL}/api/leaderboard`);
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
                 console.log('Leaderboard from API');
+                if (typeof showSnackbar === 'function') {
+                    if (leaderboard.length === 0) {
+                        showSnackbar('No scores yet', 'info');
+                    } else {
+                        showSnackbar(`Top ${leaderboard.length} players loaded`, 'success');
+                    }
+                }
+
+                const sorted = leaderboard
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 100);
+
+                cachedLeaderboard = sorted;
+                cachedLeaderboardTimestamp = now;
+                return sorted;
             }
+        } else {
+            throw new Error(`API error: ${res.status}`);
         }
     } catch (e) {
         console.warn('API failed, fallback to CloudStorage', e);
-        if (typeof showSnackbar === 'function') showSnackbar('Using local stats', 'info');
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Cloud storage: loading...', 'info');
+        }
     }
 
     // 2. CloudStorage fallback
@@ -117,9 +136,15 @@ const loadLeaderboard = async () => {
             if (Array.isArray(parsed)) {
                 leaderboard = parsed;
                 console.log('Leaderboard from CloudStorage');
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Loaded from cloud', 'info');
+                }
             }
         } catch (e) {
             console.warn('CloudStorage failed, fallback to localStorage', e);
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Loading local data...', 'warning');
+            }
         }
     }
 
@@ -131,9 +156,15 @@ const loadLeaderboard = async () => {
             if (Array.isArray(parsed)) {
                 leaderboard = parsed;
                 console.log('Leaderboard from localStorage');
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Using local data', 'info');
+                }
             }
         } catch (e) {
             console.warn('localStorage failed', e);
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('No saved scores found', 'error');
+            }
         }
     }
 
@@ -172,10 +203,16 @@ const loadPersonalStats = async () => {
                     lastUpdated: data.timestamp || Date.now()
                 };
                 console.log('✅ Personal stats from API');
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Stats loaded', 'success');
+                }
             }
         }
     } catch (e) {
         console.warn('⚠️ API stats failed → fallback to CloudStorage', e);
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Syncing from cloud...', 'info');
+        }
     }
 
     // 2. CloudStorage fallback
@@ -186,11 +223,14 @@ const loadPersonalStats = async () => {
             if (parsed && typeof parsed.highScore !== 'undefined') {
                 stats = parsed;
                 console.log('✅ Personal stats from CloudStorage');
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Loaded from cloud', 'info');
+                }
             }
         } catch (e) {
             console.warn('⚠️ CloudStorage stats failed → fallback to localStorage', e);
             if (typeof showSnackbar === 'function') {
-                showSnackbar("Local stats loaded", "info");
+                showSnackbar('Local stats loaded', 'info');
             }
         }
     }
@@ -210,6 +250,9 @@ const loadPersonalStats = async () => {
                     lastUpdated: Date.now()
                 };
                 console.log('✅ Personal stats from localStorage');
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Local stats loaded', 'info');
+                }
             }
         } catch (e) {
             console.warn('⚠️ localStorage stats failed', e);
@@ -221,7 +264,6 @@ const loadPersonalStats = async () => {
     return stats;
 };
 
-
 // === Сохранение в лидерборд с защитой ===
 const saveScoreToLeaderboard = async (score, level) => {
     if (!APP_USER_ID || !APP_USERNAME) {
@@ -232,6 +274,7 @@ const saveScoreToLeaderboard = async (score, level) => {
     const now = Date.now();
     if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
         console.warn('Too fast! Wait...');
+        if (typeof showSnackbar === 'function') showSnackbar('Wait before saving again', 'warning');
         return;
     }
 
@@ -254,12 +297,13 @@ const saveScoreToLeaderboard = async (score, level) => {
         if (res.ok) {
             cachedLeaderboard = null;
             lastSaveTime = now;
-            if (typeof showSnackbar === 'function') showSnackbar(`Score saved: ${score}!`, 'success');
+            if (typeof showSnackbar === 'function') showSnackbar(`✅ Score saved: ${score}`, 'success');
         } else {
             throw new Error('API rejected');
         }
     } catch (e) {
         console.warn('API failed, saving locally', e);
+        if (typeof showSnackbar === 'function') showSnackbar('💾 Saving offline...', 'info');
         await fallbackSaveToStorage(userData);
     }
 
@@ -270,7 +314,9 @@ const saveScoreToLeaderboard = async (score, level) => {
         const container = document.getElementById('statsContent');
         if (container) {
             const leaderboard = await loadLeaderboard();
-            renderLeaderboard(leaderboard, container);
+            if (document.querySelector('.stats-tab.active')?.dataset.tab === 'global') {
+                renderLeaderboard(leaderboard, container);
+            }
         }
     }
 };
@@ -304,6 +350,9 @@ const fallbackSaveToStorage = async (userData) => {
 
             safeSetItem('snakeLeaderboard', JSON.stringify(final));
             console.log('💾 Saved to CloudStorage & localStorage');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Synced offline', 'info');
+            }
         }
     } catch (e) {
         try {
@@ -315,10 +364,13 @@ const fallbackSaveToStorage = async (userData) => {
                 .slice(0, 100);
             safeSetItem('snakeLeaderboard', JSON.stringify(saved));
             console.log('💾 Saved to localStorage');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Saved locally', 'info');
+            }
         } catch (e2) {
             console.error('❌ All save methods failed');
             if (typeof showSnackbar === 'function') {
-                showSnackbar("Save failed", "error");
+                showSnackbar('Save failed', 'error');
             }
         }
     }
@@ -337,14 +389,23 @@ const savePersonalStats = async (stats) => {
         }
         cachedPersonalStats = { ...stats, lastUpdated: Date.now() };
         console.log('✅ Personal stats saved to CloudStorage');
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Profile saved', 'success');
+        }
     } catch (e) {
         try {
             safeSetItem('snakeHighScore', String(stats.highScore || 0));
             safeSetItem('totalGames', String(stats.totalGames || 0));
             safeSetItem('totalScore', String(stats.totalScore || 0));
             console.log('✅ Personal stats saved to localStorage');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Saved locally', 'info');
+            }
         } catch (e2) {
             console.error('❌ Failed to save personal stats');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Save failed', 'error');
+            }
         }
     }
 };
@@ -388,46 +449,46 @@ const renderLeaderboard = (leaderboard, container) => {
 
 // === Рендер личной статистики ===
 const renderPersonalStats = async (container) => {
-  if (!container) return;
+    if (!container) return;
 
-  let stats = null;
-  let highScore = 0;
-  let totalGames = 0;
-  let totalScore = 0;
-  let avgScore = 0;
+    let stats = null;
+    let highScore = 0;
+    let totalGames = 0;
+    let totalScore = 0;
+    let avgScore = 0;
 
-  // Для авторизованных пользователей загружаем из облака/API
-  if (APP_USER_ID) {
-    stats = await loadPersonalStats();
-    if (stats) {
-      highScore = stats.highScore || 0;
-      totalGames = stats.totalGames || 0;
-      totalScore = stats.totalScore || 0;
+    // Для авторизованных пользователей загружаем из облака/API
+    if (APP_USER_ID) {
+        stats = await loadPersonalStats();
+        if (stats) {
+            highScore = stats.highScore || 0;
+            totalGames = stats.totalGames || 0;
+            totalScore = stats.totalScore || 0;
+        }
     }
-  }
 
-  // Для гостей или если не удалось загрузить - берем из localStorage
-  if (!stats) {
-    try {
-      highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
-      totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
-      totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
-      console.log('📊 Guest stats from localStorage:', { highScore, totalGames, totalScore });
-    } catch (e) {
-      console.warn('⚠️ Failed to load guest stats from localStorage', e);
+    // Для гостей или если не удалось загрузить - берем из localStorage
+    if (!stats) {
+        try {
+            highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+            totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
+            totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
+            console.log('📊 Guest stats from localStorage:', { highScore, totalGames, totalScore });
+        } catch (e) {
+            console.warn('⚠️ Failed to load guest stats from localStorage', e);
+        }
     }
-  }
 
-  avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
+    avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
 
-  let guestNotice = '';
-  if (!getTelegramUser()) {
-    guestNotice = `<p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
+    let guestNotice = '';
+    if (!getTelegramUser()) {
+        guestNotice = `<p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
       📱 Play in Telegram for full sync
     </p>`;
-  }
+    }
 
-  container.innerHTML = `
+    container.innerHTML = `
     <div class="stats-info">
       <div class="stats-grid">
         <div class="stat-item">
