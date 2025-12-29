@@ -970,3 +970,15 @@
     box-shadow: 0 0 16px rgba(255, 0, 0, 0.4);
     transform: scale(1.02);
 }
+
+#resetConfirmation input:focus {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 8px rgba(255, 30, 120, 0.5);
+    outline: none;
+}
+
+#resetConfirmation button:hover:not([disabled]) {
+    background: #ff0000;
+    transform: scale(1.03);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
