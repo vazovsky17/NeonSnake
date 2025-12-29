@@ -588,3 +588,10 @@ window.loadPersonalStats = loadPersonalStats;
 window.savePersonalStats = savePersonalStats;
 window.saveScoreToLeaderboard = saveScoreToLeaderboard;
 window.loadLeaderboard = loadLeaderboard;
+
+window.resetAppCache = () => {
+    cachedLeaderboard = null;
+    cachedLeaderboardTimestamp = 0;
+    cachedPersonalStats = null;
+    cachedPersonalStatsTimestamp = 0;
+};

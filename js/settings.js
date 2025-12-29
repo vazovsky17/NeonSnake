@@ -103,44 +103,64 @@ function saveSetting(key, value) {
     syncToCloud();
 }
 
-// === 🟢 Сброс всех данных (локальных + Telegram Cloud) ===
+// === 🧹 Сброс всех данных: локально, в облаке и кэш ===
 function resetAllData() {
-    if (!confirm('⚠️ Are you sure? This will delete:\n- Your high score\n- Game progress\n- Settings\n\nThis cannot be undone.')) {
+    if (!confirm('⚠️ Are you sure? This will delete:\n- Your high score\n- Game progress\n- Settings\n- Leaderboard\n\nThis cannot be undone.')) {
         return;
     }
 
     const tg = window.Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id || '';
 
     try {
         // 1. Очищаем localStorage
-        localStorage.removeItem('snakeHighScore');
-        localStorage.removeItem('totalGames');
-        localStorage.removeItem('totalScore');
-        localStorage.removeItem('snakeLeaderboard');
-        localStorage.removeItem('appSettings');
-        localStorage.removeItem('user_stats_' + (window.Telegram?.WebApp?.initDataUnsafe?.user?.id || ''));
+        [
+            'snakeHighScore',
+            'totalGames',
+            'totalScore',
+            'snakeLeaderboard',
+            'appSettings',
+            `user_stats_${userId}`
+        ].forEach(key => {
+            localStorage.removeItem(key);
+        });
 
         // 2. Очищаем Telegram Cloud Storage
         if (typeof window.saveToCloud === 'function') {
             window.saveToCloud('snakeLeaderboard', null);
             window.saveToCloud('appSettings', null);
-            window.saveToCloud('user_stats_' + (window.Telegram?.WebApp?.initDataUnsafe?.user?.id || ''), null);
+            window.saveToCloud(`user_stats_${userId}`, null);
         }
 
-        // 3. Сбрасываем кэш в stats.js
-        if (typeof window.loadLeaderboard === 'function') {
-            window.loadLeaderboard = () => Promise.resolve([]);
-        }
-        if (typeof window.loadPersonalStats === 'function') {
-            window.loadPersonalStats = () => Promise.resolve(null);
+        // 3. 🧹 Сбрасываем кэш (из stats.js)
+        if (typeof window.resetAppCache === 'function') {
+            window.resetAppCache();
         }
 
-        // 4. Уведомление
+        // 4. Обновляем глобальные переменные (если они в stats.js)
+        // Это важно, чтобы при следующем вызове loadLeaderboard() не вернулся старый кэш
+
+        // 5. Сбрасываем состояние игры (если есть)
+        if (typeof window.resetGameStats === 'function') {
+            window.resetGameStats();
+        }
+
+        // 6. Обновляем UI, если открыта статистика
+        const statsContent = document.getElementById('statsContent');
+        if (statsContent) {
+            statsContent.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--neon-blue); opacity: 0.8;">
+                    <p style="font-family: 'Orbitron', sans-serif; font-size: 18px; margin-bottom: 10px;">🗑️ Data Cleared</p>
+                    <p style="font-size: 14px;">Start a new game to set a record!</p>
+                </div>`;
+        }
+
+        // 7. Показываем уведомление
         if (typeof showSnackbar === 'function') {
-            showSnackbar('🧹 Data reset!', 'info');
+            showSnackbar('🧹 All data reset!', 'info');
         }
 
-        // 5. Звук и вибрация
+        // 8. Звук и вибрация
         if (window.soundManager && window.appSettings.sound) {
             window.soundManager.play('error');
         }
@@ -148,13 +168,8 @@ function resetAllData() {
             tg.HapticFeedback.notificationOccurred('error');
         }
 
-        // 6. Закрываем модалку
+        // 9. Закрываем модалку
         document.getElementById('settingsModal')?.classList.remove('show');
-
-        // 7. Обновляем UI (если есть stats)
-        if (document.getElementById('statsContent')) {
-            document.getElementById('statsContent').innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No data yet</div>';
-        }
 
     } catch (err) {
         console.error('Failed to reset data', err);
