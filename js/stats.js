@@ -11,6 +11,20 @@ const safeBtoa = (str) => {
     }
 };
 
+// 🔁 Синхронизированная функция base64, максимально близкая к Node.js Buffer
+const createHash = (userId, score, level, timestamp) => {
+    const input = `${userId}:${score}:${level}:${timestamp}`;
+    // Используем TextEncoder для совместимости
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(input);
+    // Конвертим в base64 вручную, как в Node.js
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).substr(0, 20);
+};
+
 const safeParse = (str) => {
     try {
         return str ? JSON.parse(str) : null;
@@ -31,16 +45,10 @@ const safeSetItem = (key, value) => {
 const loadFromCloudWithTimeout = (key) => {
     return new Promise((resolve) => {
         if (!window.loadFromCloud) {
-            console.warn('loadFromCloud not available');
             resolve(null);
             return;
         }
-
-        const timer = setTimeout(() => {
-            console.warn('loadFromCloud timeout (3s)');
-            resolve(null);
-        }, 3000);
-
+        const timer = setTimeout(() => resolve(null), 3000);
         try {
             window.loadFromCloud(key, (data) => {
                 clearTimeout(timer);
@@ -48,7 +56,6 @@ const loadFromCloudWithTimeout = (key) => {
             });
         } catch (e) {
             clearTimeout(timer);
-            console.warn('loadFromCloud error', e);
             resolve(null);
         }
     });
@@ -61,9 +68,10 @@ const getTelegramUser = () => {
 };
 
 // === Глобальные переменные ===
-const APP_USER_ID = getTelegramUser() ? String(getTelegramUser().id) : null;
-const APP_USER_NAME = getTelegramUser()
-    ? [getTelegramUser().first_name, getTelegramUser().last_name]
+const tgUser = getTelegramUser();
+const APP_USER_ID = tgUser ? String(tgUser.id) : null;
+const APP_USERNAME = tgUser
+    ? [tgUser.first_name, tgUser.last_name]
         .filter(Boolean)
         .join(' ')
         .trim() || 'Anonymous'
@@ -72,60 +80,42 @@ const APP_USER_NAME = getTelegramUser()
 // === Кэширование ===
 let cachedLeaderboard = null;
 let cachedLeaderboardTimestamp = 0;
-const LEADERBOARD_CACHE_TTL = 30000; // 30 секунд
+const LEADERBOARD_CACHE_TTL = 30000; // 30 сек
 
 let cachedPersonalStats = null;
 let cachedPersonalStatsTimestamp = 0;
-const PERSONAL_STATS_CACHE_TTL = 10000; // 10 секунд
+const PERSONAL_STATS_CACHE_TTL = 10000; // 10 сек
 
-// === Бэкенд API URL ===
+// === API URL ===
 const API_URL = 'https://neon-snake-leaderboard.vercel.app';
 
-// === Анти-спам: нельзя отправлять чаще 1 раза в 5 сек ===
+// === Анти-спам ===
 let lastSaveTime = 0;
-const MIN_SAVE_INTERVAL = 5000;
+const MIN_SAVE_INTERVAL = 10000; // Должно быть >= MIN_INTERVAL на сервере (10 сек)
 
-// === Загрузка лидерборда: API → CloudStorage → localStorage ===
+// === Загрузка лидерборда: API → Cloud → LocalStorage ===
 const loadLeaderboard = async () => {
     const now = Date.now();
-    if (cachedLeaderboard && (now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL)) {
+    if (cachedLeaderboard && now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL) {
         return cachedLeaderboard;
     }
 
     let leaderboard = [];
 
-    // 1. Попытка загрузить из API
+    // 1. API
     try {
         const res = await fetch(`${API_URL}/api/leaderboard`);
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
-                console.log('Leaderboard from API');
                 if (typeof showSnackbar === 'function') {
-                    if (leaderboard.length === 0) {
-                        showSnackbar('No scores yet', 'info');
-                    } else {
-                        showSnackbar(`Top ${leaderboard.length} players loaded`, 'success');
-                    }
+                    showSnackbar(leaderboard.length ? `Top ${leaderboard.length}` : 'No scores yet', 'info');
                 }
-
-                const sorted = leaderboard
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 100);
-
-                cachedLeaderboard = sorted;
-                cachedLeaderboardTimestamp = now;
-                return sorted;
             }
-        } else {
-            throw new Error(`API error: ${res.status}`);
         }
     } catch (e) {
-        console.warn('API failed, fallback to CloudStorage', e);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Cloud storage: loading...', 'info');
-        }
+        console.warn('API leaderboard failed', e);
     }
 
     // 2. CloudStorage fallback
@@ -133,19 +123,8 @@ const loadLeaderboard = async () => {
         try {
             const data = await loadFromCloudWithTimeout('leaderboard');
             const parsed = safeParse(data);
-            if (Array.isArray(parsed)) {
-                leaderboard = parsed;
-                console.log('Leaderboard from CloudStorage');
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Loaded from cloud', 'info');
-                }
-            }
-        } catch (e) {
-            console.warn('CloudStorage failed, fallback to localStorage', e);
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Loading local data...', 'warning');
-            }
-        }
+            if (Array.isArray(parsed)) leaderboard = parsed;
+        } catch (e) { }
     }
 
     // 3. localStorage fallback
@@ -153,33 +132,21 @@ const loadLeaderboard = async () => {
         try {
             const saved = localStorage.getItem('snakeLeaderboard');
             const parsed = safeParse(saved);
-            if (Array.isArray(parsed)) {
-                leaderboard = parsed;
-                console.log('Leaderboard from localStorage');
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Using local data', 'info');
-                }
-            }
-        } catch (e) {
-            console.warn('localStorage failed', e);
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('No saved scores found', 'error');
-            }
-        }
+            if (Array.isArray(parsed)) leaderboard = parsed;
+        } catch (e) { }
     }
 
-    const sorted = Array.isArray(leaderboard)
-        ? leaderboard
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 100)
-        : [];
+    // Сортировка и кэширование
+    const sorted = leaderboard
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 100);
 
     cachedLeaderboard = sorted;
     cachedLeaderboardTimestamp = now;
     return sorted;
 };
 
-// === Загрузка личной статистики: API → CloudStorage → localStorage ===
+// === Загрузка личной статистики ===
 const loadPersonalStats = async () => {
     if (!APP_USER_ID) return null;
 
@@ -190,73 +157,52 @@ const loadPersonalStats = async () => {
 
     let stats = null;
 
-    // 1. Попытка загрузить из API
+    // 1. API
     try {
         const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`);
         if (res.ok) {
             const data = await res.json();
-            if (data && typeof data.score !== 'undefined') {
+            if (data.score !== undefined) {
                 stats = {
                     highScore: data.score || 0,
                     totalGames: data.totalGames || 0,
                     totalScore: data.totalScore || 0,
-                    lastUpdated: data.timestamp || Date.now()
+                    lastUpdated: data.timestamp || now,
+                    level: data.level || 1
                 };
-                console.log('✅ Personal stats from API');
                 if (typeof showSnackbar === 'function') {
                     showSnackbar('Stats loaded', 'success');
                 }
             }
         }
     } catch (e) {
-        console.warn('⚠️ API stats failed → fallback to CloudStorage', e);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Syncing from cloud...', 'info');
-        }
+        console.warn('API personal stats failed', e);
     }
 
-    // 2. CloudStorage fallback
+    // 2. CloudStorage
     if (!stats) {
         try {
             const data = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
             const parsed = safeParse(data);
-            if (parsed && typeof parsed.highScore !== 'undefined') {
-                stats = parsed;
-                console.log('✅ Personal stats from CloudStorage');
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Loaded from cloud', 'info');
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ CloudStorage stats failed → fallback to localStorage', e);
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Local stats loaded', 'info');
-            }
-        }
+            if (parsed && parsed.highScore !== undefined) stats = parsed;
+        } catch (e) { }
     }
 
-    // 3. localStorage fallback
+    // 3. localStorage
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
             const totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
             const totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
-
-            if (highScore > 0 || totalGames > 0 || totalScore > 0) {
+            if (highScore || totalGames || totalScore) {
                 stats = {
                     highScore,
                     totalGames,
                     totalScore,
-                    lastUpdated: Date.now()
+                    lastUpdated: now
                 };
-                console.log('✅ Personal stats from localStorage');
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Local stats loaded', 'info');
-                }
             }
-        } catch (e) {
-            console.warn('⚠️ localStorage stats failed', e);
-        }
+        } catch (e) { }
     }
 
     cachedPersonalStats = stats;
@@ -264,7 +210,7 @@ const loadPersonalStats = async () => {
     return stats;
 };
 
-// === Сохранение в лидерборд с защитой ===
+// === Сохранение результата ===
 const saveScoreToLeaderboard = async (score, level) => {
     if (!APP_USER_ID || !APP_USERNAME) {
         if (typeof showSnackbar === 'function') showSnackbar('Guest can\'t save', 'info');
@@ -273,18 +219,20 @@ const saveScoreToLeaderboard = async (score, level) => {
 
     const now = Date.now();
     if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
-        console.warn('Too fast! Wait...');
-        if (typeof showSnackbar === 'function') showSnackbar('Wait before saving again', 'warning');
+        if (typeof showSnackbar === 'function') showSnackbar('Wait before saving...', 'warning');
         return;
     }
+
+    const timestamp = now;
+    const hash = createHash(APP_USER_ID, score, level, timestamp); // ← Ключевое: совпадает с сервером
 
     const userData = {
         userId: APP_USER_ID,
         name: APP_USERNAME,
         score,
         level,
-        timestamp: now,
-        hash: safeBtoa(`${APP_USER_ID}:${score}:${level}:${now}`).substr(0, 20)
+        timestamp,
+        hash
     };
 
     try {
@@ -297,31 +245,38 @@ const saveScoreToLeaderboard = async (score, level) => {
         if (res.ok) {
             cachedLeaderboard = null;
             lastSaveTime = now;
-            if (typeof showSnackbar === 'function') showSnackbar(`✅ Score saved: ${score}`, 'success');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar(`✅ Score saved: ${score}`, 'success');
+            }
         } else {
-            throw new Error('API rejected');
+            const err = await res.json().catch(() => ({}));
+            console.warn('Save failed:', err?.error || res.status);
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Saving offline...', 'info');
+            }
+            await fallbackSaveToStorage(userData);
         }
     } catch (e) {
-        console.warn('API failed, saving locally', e);
-        if (typeof showSnackbar === 'function') showSnackbar('💾 Saving offline...', 'info');
+        console.warn('Network error, saving locally', e);
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Offline saved', 'info');
+        }
         await fallbackSaveToStorage(userData);
     }
 
-    // UI refresh
+    // Обновление UI
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
         const container = document.getElementById('statsContent');
         if (container) {
             const leaderboard = await loadLeaderboard();
-            if (document.querySelector('.stats-tab.active')?.dataset.tab === 'global') {
-                renderLeaderboard(leaderboard, container);
-            }
+            renderLeaderboard(leaderboard, container);
         }
     }
 };
 
-// === Fallback: если API недоступен ===
+// === Fallback сохранение ===
 const fallbackSaveToStorage = async (userData) => {
     if (!userData.userId) return;
 
@@ -344,14 +299,13 @@ const fallbackSaveToStorage = async (userData) => {
             if (typeof window.saveToCloud === 'function') {
                 window.saveToCloud('leaderboard', JSON.stringify(final));
             }
+            safeSetItem('snakeLeaderboard', JSON.stringify(final));
 
             cachedLeaderboard = final;
             cachedLeaderboardTimestamp = Date.now();
 
-            safeSetItem('snakeLeaderboard', JSON.stringify(final));
-            console.log('💾 Saved to CloudStorage & localStorage');
             if (typeof showSnackbar === 'function') {
-                showSnackbar('Synced offline', 'info');
+                showSnackbar('Saved offline', 'info');
             }
         }
     } catch (e) {
@@ -363,12 +317,10 @@ const fallbackSaveToStorage = async (userData) => {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 100);
             safeSetItem('snakeLeaderboard', JSON.stringify(saved));
-            console.log('💾 Saved to localStorage');
             if (typeof showSnackbar === 'function') {
                 showSnackbar('Saved locally', 'info');
             }
         } catch (e2) {
-            console.error('❌ All save methods failed');
             if (typeof showSnackbar === 'function') {
                 showSnackbar('Save failed', 'error');
             }
@@ -382,44 +334,30 @@ const savePersonalStats = async (stats) => {
 
     try {
         if (typeof window.saveToCloud === 'function') {
-            window.saveToCloud(`user_stats_${APP_USER_ID}`, JSON.stringify({
-                ...stats,
-                lastUpdated: Date.now(),
-            }));
+            window.saveToCloud(`user_stats_${APP_USER_ID}`, JSON.stringify(stats));
         }
-        cachedPersonalStats = { ...stats, lastUpdated: Date.now() };
-        console.log('✅ Personal stats saved to CloudStorage');
+        safeSetItem('snakeHighScore', stats.highScore);
+        safeSetItem('totalGames', stats.totalGames);
+        safeSetItem('totalScore', stats.totalScore);
+        cachedPersonalStats = { ...stats };
         if (typeof showSnackbar === 'function') {
-            showSnackbar('Profile saved', 'success');
+            showSnackbar('Stats saved', 'success');
         }
     } catch (e) {
-        try {
-            safeSetItem('snakeHighScore', String(stats.highScore || 0));
-            safeSetItem('totalGames', String(stats.totalGames || 0));
-            safeSetItem('totalScore', String(stats.totalScore || 0));
-            console.log('✅ Personal stats saved to localStorage');
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Saved locally', 'info');
-            }
-        } catch (e2) {
-            console.error('❌ Failed to save personal stats');
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Save failed', 'error');
-            }
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Failed to save', 'error');
         }
     }
 };
 
 // === Рендер лидерборда ===
 const renderLeaderboard = (leaderboard, container) => {
-    if (!container || !document.querySelector('.stats-tab.active')?.dataset.tab === 'global') return;
+    if (!container) return;
 
     if (!Array.isArray(leaderboard) || leaderboard.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 40px; color: var(--neon-blue); opacity: 0.8;">
-                <p style="font-family: 'Orbitron', sans-serif; font-size: 18px; margin-bottom: 10px;">
-                    🏆 No scores yet
-                </p>
+                <p style="font-family: 'Orbitron', sans-serif; font-size: 18px; margin-bottom: 10px;">🏆 No scores yet</p>
                 <p style="font-size: 14px;">Be the first to set a record!</p>
             </div>
         `;
@@ -429,14 +367,14 @@ const renderLeaderboard = (leaderboard, container) => {
     let html = '<div class="leaderboard">';
     leaderboard.slice(0, 50).forEach((entry, index) => {
         const rank = index + 1;
-        const isCurrentUser = entry.userId === APP_USER_ID;
+        const isYou = entry.userId === APP_USER_ID;
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
         html += `
-            <div class="leaderboard-item ${isCurrentUser ? 'current-user' : ''}">
-                <div class="rank" style="color: ${rank <= 3 ? 'var(--neon-yellow)' : ''};">${medal}</div>
+            <div class="leaderboard-item ${isYou ? 'current-user' : ''}">
+                <div class="rank" style="color:${rank <= 3 ? 'var(--neon-yellow)' : ''}">${medal}</div>
                 <div class="player-info">
-                    <div class="player-name">${entry.name}${isCurrentUser ? ' (You)' : ''}</div>
+                    <div class="player-name">${entry.name}${isYou ? ' (You)' : ''}</div>
                     <div class="player-level">Level ${entry.level}</div>
                 </div>
                 <div class="player-score">${entry.score.toLocaleString()}</div>
@@ -451,122 +389,70 @@ const renderLeaderboard = (leaderboard, container) => {
 const renderPersonalStats = async (container) => {
     if (!container) return;
 
-    let stats = null;
-    let highScore = 0;
-    let totalGames = 0;
-    let totalScore = 0;
-    let avgScore = 0;
-
-    // Для авторизованных пользователей загружаем из облака/API
-    if (APP_USER_ID) {
-        stats = await loadPersonalStats();
-        if (stats) {
-            highScore = stats.highScore || 0;
-            totalGames = stats.totalGames || 0;
-            totalScore = stats.totalScore || 0;
-        }
-    }
-
-    // Для гостей или если не удалось загрузить - берем из localStorage
-    if (!stats) {
-        try {
-            highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
-            totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
-            totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
-            console.log('📊 Guest stats from localStorage:', { highScore, totalGames, totalScore });
-        } catch (e) {
-            console.warn('⚠️ Failed to load guest stats from localStorage', e);
-        }
-    }
-
-    avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
+    const stats = await loadPersonalStats();
+    const highScore = stats?.highScore || 0;
+    const totalGames = stats?.totalGames || 0;
+    const totalScore = stats?.totalScore || 0;
+    const avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
 
     let guestNotice = '';
     if (!getTelegramUser()) {
-        const telegramUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+        const webUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+        const tgUrl = 'tg://resolve?domain=vazovskyapps_bot&appname=neonsnake';
+
+        const m = navigator.language.startsWith('ru')
+            ? { sync: 'Играйте в Telegram для синхронизации', open: 'Открыть в Telegram' }
+            : { sync: 'Play in Telegram for full sync', open: 'Open in Telegram' };
+
         guestNotice = `
             <p style="color: var(--neon-red); font-size: 12px; margin-top: 10px; opacity: 0.9;">
-                📱 Play in Telegram for full sync
+                📱 ${m.sync}
             </p>
-            <a 
-                href="${telegramUrl}" 
-                target="_blank"
-                style="
-                    display: inline-block;
-                    margin-top: 10px;
-                    padding: 8px 16px;
-                    font-family: 'Orbitron', sans-serif;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: var(--neon-blue);
-                    background: transparent;
-                    border: 2px solid var(--neon-blue);
-                    border-radius: 6px;
-                    text-decoration: none;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
-                    transition: all 0.3s ease;
-                "
-                onmouseover="this.style.boxShadow='0 0 14px rgba(0, 255, 255, 0.8)'; this.style.transform='scale(1.05)';"
-                onmouseout="this.style.boxShadow='0 0 8px rgba(0, 255, 255, 0.5)'; this.style.transform='scale(1)';"
-            >
-                Open in Telegram
+            <a href="${webUrl}" target="_blank" rel="noopener"
+               style="display: inline-block; margin-top: 8px; padding: 8px 14px; font: bold 13px 'Orbitron'; color: var(--neon-blue); 
+                      border: 2px solid var(--neon-blue); border-radius: 6px; background: transparent; text-decoration: none;
+                      text-transform: uppercase; letter-spacing: 0.8px; box-shadow: 0 0 8px rgba(0,255,255,0.5); transition: all 0.3s ease;"
+               onmouseover="this.style.boxShadow='0 0 14px rgba(0,255,255,0.8)'; this.style.transform='scale(1.05)';"
+               onmouseout="this.style.boxShadow='0 0 8px rgba(0,255,255,0.5)'; this.style.transform='scale(1)';">
+                ${m.open}
             </a>
         `;
     }
 
     container.innerHTML = `
-    <div class="stats-info">
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-item-label">Best Score</div>
-          <div class="stat-item-value">${highScore.toLocaleString()}</div>
+        <div class="stats-info">
+            <div class="stats-grid">
+                <div class="stat-item"><div class="stat-item-label">Best Score</div><div class="stat-item-value">${highScore.toLocaleString()}</div></div>
+                <div class="stat-item"><div class="stat-item-label">Total Games</div><div class="stat-item-value">${totalGames}</div></div>
+                <div class="stat-item"><div class="stat-item-label">Total Score</div><div class="stat-item-value">${totalScore.toLocaleString()}</div></div>
+                <div class="stat-item"><div class="stat-item-label">Avg Score</div><div class="stat-item-value">${avgScore.toLocaleString()}</div></div>
+            </div>
+            <div style="text-align: center; padding: 20px; color: var(--neon-purple); font-size: 14px;">
+                <p style="margin-bottom: 5px;">👤 ${APP_USERNAME}</p>
+                <p style="opacity: 0.7;">Keep playing to climb the ranks!</p>
+                ${guestNotice}
+            </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-item-label">Total Games</div>
-          <div class="stat-item-value">${totalGames}</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-item-label">Total Score</div>
-          <div class="stat-item-value">${totalScore.toLocaleString()}</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-item-label">Avg Score</div>
-          <div class="stat-item-value">${avgScore.toLocaleString()}</div>
-        </div>
-      </div>
-      <div style="text-align: center; padding: 20px; color: var(--neon-purple); font-size: 14px;">
-        <p style="margin-bottom: 5px;">👤 ${APP_USER_NAME}</p>
-        <p style="opacity: 0.7;">Keep playing to climb the ranks!</p>
-        ${guestNotice}
-      </div>
-    </div>
-  `;
+    `;
 };
 
-// === UI: открытие / переключение ===
+// === UI: Открытие модалки ===
 document.getElementById('statsBtn')?.addEventListener('click', async () => {
-    if (window.soundManager && typeof window.soundManager.play === 'function') {
-        window.soundManager.play('click');
-    }
-    if (window.isGameRunning && !window.isPaused && typeof window.togglePause === 'function') {
-        window.togglePause();
-    }
+    if (window.soundManager?.play) window.soundManager.play('click');
+    if (window.isGameRunning && !window.isPaused && window.togglePause) window.togglePause();
 
     const modal = document.getElementById('statsModal');
     if (!modal) return;
     modal.classList.add('show');
 
-    const tab = document.querySelector('.stats-tab.active');
+    const activeTab = document.querySelector('.stats-tab.active')?.dataset.tab;
     const content = document.getElementById('statsContent');
+    if (!content) return;
 
-    if (tab?.dataset.tab === 'global') {
+    if (activeTab === 'global') {
         content.innerHTML = '<div class="loading">Loading...</div>';
         const leaderboard = await loadLeaderboard();
-        if (document.querySelector('.stats-tab.active')?.dataset.tab === 'global') {
-            renderLeaderboard(leaderboard, content);
-        }
+        renderLeaderboard(leaderboard, content);
     } else {
         await renderPersonalStats(content);
     }
@@ -586,9 +472,7 @@ document.querySelectorAll('.stats-tab').forEach(tab => {
         if (tab.dataset.tab === 'global') {
             content.innerHTML = '<div class="loading">Loading...</div>';
             const leaderboard = await loadLeaderboard();
-            if (document.querySelector('.stats-tab.active')?.dataset.tab === 'global') {
-                renderLeaderboard(leaderboard, content);
-            }
+            renderLeaderboard(leaderboard, content);
         } else {
             await renderPersonalStats(content);
         }

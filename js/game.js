@@ -343,7 +343,6 @@ const gameOver = () => {
         console.warn('saveScoreToLeaderboard is not available');
     }
 
-    // Остальной код...
     document.getElementById('finalScore').textContent = score;
 
     const levelUpNotice = document.getElementById('levelUpNotice');
