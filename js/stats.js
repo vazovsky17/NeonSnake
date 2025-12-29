@@ -93,10 +93,12 @@ const MIN_SAVE_INTERVAL = 10000; // Должно совпадать с серв�
 const loadLeaderboard = async () => {
     const now = Date.now();
     if (cachedLeaderboard && now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL) {
+        cachedLeaderboard._source = 'Cache';
         return cachedLeaderboard;
     }
 
     let leaderboard = [];
+    let source = 'Local';
 
     try {
         const res = await fetch(`${API_URL}/api/leaderboard`, {
@@ -108,6 +110,7 @@ const loadLeaderboard = async () => {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
+                source = 'API';
                 if (typeof showSnackbar === 'function') {
                     if (leaderboard.length === 0) {
                         showSnackbar('No scores yet', 'info');
@@ -126,7 +129,10 @@ const loadLeaderboard = async () => {
         try {
             const data = await loadFromCloudWithTimeout('leaderboard');
             const parsed = safeParse(data);
-            if (Array.isArray(parsed)) leaderboard = parsed;
+            if (Array.isArray(parsed)) {
+                leaderboard = parsed;
+                source = 'Telegram';
+            }
         } catch (e) { }
     }
 
@@ -135,17 +141,23 @@ const loadLeaderboard = async () => {
         try {
             const saved = localStorage.getItem('snakeLeaderboard');
             const parsed = safeParse(saved);
-            if (Array.isArray(parsed)) leaderboard = parsed;
+            if (Array.isArray(parsed)) {
+                leaderboard = parsed;
+                source = 'Local';
+            }
         } catch (e) { }
     }
 
-    // Сортируем по убыванию счёта и кэшируем
+    // Сортируем по убыванию и ограничиваем до 100
     const sorted = leaderboard
         .sort((a, b) => b.score - a.score)
         .slice(0, 100);
 
     cachedLeaderboard = sorted;
     cachedLeaderboardTimestamp = now;
+
+    // Добавляем метку источника
+    sorted._source = source;
     return sorted;
 };
 
@@ -155,10 +167,12 @@ const loadPersonalStats = async () => {
 
     const now = Date.now();
     if (cachedPersonalStats && now - cachedPersonalStatsTimestamp < PERSONAL_STATS_CACHE_TTL) {
+        cachedPersonalStats._source = 'Cache';
         return cachedPersonalStats;
     }
 
     let stats = null;
+    let source = 'Local';
 
     try {
         const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`, {
@@ -177,6 +191,7 @@ const loadPersonalStats = async () => {
                 lastUpdated: data.timestamp || now,
                 deleted: !!data.deletedAt
             };
+            source = 'API';
             if (typeof showSnackbar === 'function') {
                 showSnackbar('Stats loaded from server', 'success');
             }
@@ -185,15 +200,19 @@ const loadPersonalStats = async () => {
         console.warn('API /score failed', e);
     }
 
-    // Fallback: Cloud или localStorage
+    // Fallback: Cloud
     if (!stats) {
         try {
             const cloud = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
             const parsed = safeParse(cloud);
-            if (parsed && parsed.highScore !== undefined) stats = parsed;
+            if (parsed && parsed.highScore !== undefined) {
+                stats = parsed;
+                source = 'Telegram';
+            }
         } catch (e) { }
     }
 
+    // Fallback: localStorage
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
@@ -201,12 +220,16 @@ const loadPersonalStats = async () => {
             const totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
             if (highScore || totalGames || totalScore) {
                 stats = { highScore, totalGames, totalScore, lastUpdated: now };
+                source = 'Local';
             }
         } catch (e) { }
     }
 
     cachedPersonalStats = stats;
     cachedPersonalStatsTimestamp = now;
+
+    // Добавляем источник
+    if (stats) stats._source = source;
     return stats;
 };
 
@@ -237,10 +260,13 @@ const saveScoreToLeaderboard = async (score, level) => {
         });
 
         if (res.ok) {
+            // Успешно, сбросим кэш
             cachedPersonalStats = null;
             cachedLeaderboard = null;
             lastSaveTime = now;
-            if (typeof showSnackbar === 'function') showSnackbar(`✅ Score saved: ${score}`, 'success');
+            if (typeof showSnackbar === 'function') {
+                showSnackbar(`✅ Score saved: ${score}`, 'success');
+            }
         } else {
             const errorData = await res.json().catch(() => ({}));
             const errorMsg = errorData.error || res.statusText;
@@ -292,16 +318,19 @@ const fallbackSaveToStorage = async (userData) => {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 100);
 
+            // Сохраняем и в облако, и в localStorage
             if (typeof window.saveToCloud === 'function') {
                 window.saveToCloud('leaderboard', JSON.stringify(final));
             }
             safeSetItem('snakeLeaderboard', JSON.stringify(final));
 
+            // Обновляем кэш
             cachedLeaderboard = final;
             cachedLeaderboardTimestamp = Date.now();
         }
     } catch (e) {
         try {
+            // Резервное сохранение в localStorage
             const local = safeParse(localStorage.getItem('snakeLeaderboard')) || [];
             const filtered = local.filter(p => p.userId !== userData.userId);
             filtered.push(userData);
@@ -319,17 +348,26 @@ const fallbackSaveToStorage = async (userData) => {
 const renderLeaderboard = (leaderboard, container) => {
     if (!container) return;
 
+    const source = leaderboard._source || 'Local';
+
     if (!Array.isArray(leaderboard) || leaderboard.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 40px; color: var(--neon-blue); opacity: 0.8;">
                 <p style="font-family: 'Orbitron', sans-serif; font-size: 18px; margin-bottom: 10px;">🏆 No scores yet</p>
                 <p style="font-size: 14px;">Be the first to set a record!</p>
+                <div style="margin-top: 10px;"><span class="data-source-tag">${source}</span></div>
             </div>
         `;
         return;
     }
 
-    let html = '<div class="leaderboard">';
+    let html = `
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+            <span class="data-source-tag">${source}</span>
+        </div>
+        <div class="leaderboard">
+    `;
+
     leaderboard.slice(0, 50).forEach((entry, index) => {
         const rank = index + 1;
         const isYou = entry.userId === APP_USER_ID;
@@ -363,6 +401,8 @@ const renderPersonalStats = async (container) => {
     if (!container) return;
 
     const stats = await loadPersonalStats();
+    const source = stats?._source || 'Local';
+
     const highScore = stats?.highScore || 0;
     const totalGames = stats?.totalGames || 0;
     const totalScore = stats?.totalScore || 0;
@@ -394,6 +434,9 @@ const renderPersonalStats = async (container) => {
     }
 
     container.innerHTML = `
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px; margin-top: -10px;">
+            <span class="data-source-tag">${source}</span>
+        </div>
         <div class="stats-info">
             <div class="stats-grid">
                 <div class="stat-item">
@@ -476,8 +519,8 @@ document.getElementById('statsModal')?.addEventListener('click', (e) => {
     }
 });
 
-// === Экспорт функций ===
+// === Экспорт функций для внешнего использования ===
 window.loadPersonalStats = loadPersonalStats;
-window.savePersonalStats = savePersonalStats;
+window.savePersonalStats = savePersonalStats; // может быть не реализована, если не используется
 window.saveScoreToLeaderboard = saveScoreToLeaderboard;
 window.loadLeaderboard = loadLeaderboard;

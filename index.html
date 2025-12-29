@@ -16,11 +16,13 @@
 
 <body>
     <div id="app">
+        <!-- Header -->
         <div class="header">
             <div class="title">NEON SNAKE</div>
             <div class="score">Score: <span id="score">0</span></div>
         </div>
 
+        <!-- Stats Bar -->
         <div class="stats-bar">
             <div class="stat-card">
                 <div class="stat-label">Level</div>
@@ -36,6 +38,7 @@
             </div>
         </div>
 
+        <!-- Level Progress Bar -->
         <div class="level-progress">
             <div class="level-progress-header">
                 <span class="level-progress-label">Next Level</span>
@@ -46,37 +49,40 @@
             </div>
         </div>
 
+        <!-- Game -->
         <div class="game-container">
             <canvas id="gameCanvas"></canvas>
         </div>
 
+        <!-- Controls -->
         <div class="controls">
             <button class="control-btn up" id="upBtn" aria-label="Вверх">
-                <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                <i class="fa-solid fa-arrow-up"></i>
             </button>
             <button class="control-btn left" id="leftBtn" aria-label="Влево">
-                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                <i class="fa-solid fa-arrow-left"></i>
             </button>
             <button class="control-btn down" id="downBtn" aria-label="Вниз">
-                <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                <i class="fa-solid fa-arrow-down"></i>
             </button>
             <button class="control-btn right" id="rightBtn" aria-label="Вправо">
-                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                <i class="fa-solid fa-arrow-right"></i>
             </button>
         </div>
 
+        <!-- Right-side fixed buttons -->
         <div class="right-stack" aria-hidden="false">
             <button class="pause-btn" id="pauseBtn" aria-label="Пауза">
-                <i class="fa-solid fa-pause" aria-hidden="true"></i>
+                <i class="fa-solid fa-pause"></i>
             </button>
             <button class="theme-btn" id="themeBtn" aria-label="Выбрать тему">
-                <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                <i class="fa-solid fa-palette"></i>
             </button>
             <button class="stats-btn" id="statsBtn" aria-label="Статистика">
-                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                <i class="fa-solid fa-chart-line"></i>
             </button>
             <button class="settings-btn" id="settingsBtn" aria-label="Настройки">
-                <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                <i class="fa-solid fa-gear"></i>
             </button>
         </div>
     </div>
@@ -100,7 +106,6 @@
             <h2 class="game-over-title">GAME OVER</h2>
             <div class="final-score">Score: <span id="finalScore">0</span></div>
             <div class="level-up-notice" id="levelUpNotice"></div>
-
             <button class="restart-btn" id="restartBtn">
                 <i class="fa-solid fa-play"></i> PLAY AGAIN
             </button>
@@ -131,7 +136,7 @@
         </div>
     </div>
 
-    <!-- === Theme Selector Modal (обновлённый) === -->
+    <!-- Theme Modal -->
     <div class="theme-modal" id="themeModal">
         <div class="modal-content theme-modal-content">
             <div class="modal-scroll-area">
@@ -193,7 +198,7 @@
         </div>
     </div>
 
-    <!-- === Stats Modal (обновлённый) === -->
+    <!-- Stats Modal -->
     <div class="stats-modal" id="statsModal">
         <div class="modal-content stats-modal-content">
             <div class="modal-scroll-area">
@@ -212,7 +217,7 @@
         </div>
     </div>
 
-    <!-- === Settings Modal (обновлённый) === -->
+    <!-- Settings Modal -->
     <div class="settings-modal" id="settingsModal">
         <div class="modal-content settings-modal-content">
             <div class="modal-scroll-area">
@@ -221,23 +226,22 @@
                     <div class="settings-list">
                         <label class="settings-item">
                             <span class="settings-label-text">Show arrows</span>
-                            <input type="checkbox" id="showArrowsCheckbox" aria-label="Show arrows">
+                            <input type="checkbox" id="showArrowsCheckbox">
                         </label>
                         <label class="settings-item">
                             <span class="settings-label-text">Sound</span>
-                            <input type="checkbox" id="soundCheckbox" aria-label="Sound">
+                            <input type="checkbox" id="soundCheckbox">
                         </label>
                         <label class="settings-item settings-volume">
                             <span class="settings-label-text">Volume</span>
                             <div class="settings-volume-control">
-                                <input type="range" id="volumeRange" min="0" max="100" step="1" value="80"
-                                    aria-label="Volume">
+                                <input type="range" id="volumeRange" min="0" max="100" step="1" value="80">
                                 <span id="volumeValue">80%</span>
                             </div>
                         </label>
                         <label class="settings-item">
                             <span class="settings-label-text">Vibration</span>
-                            <input type="checkbox" id="vibrationCheckbox" aria-label="Vibration">
+                            <input type="checkbox" id="vibrationCheckbox">
                         </label>
                     </div>
                     <button class="stats-close-btn" id="settingsCloseBtn">Close</button>
@@ -245,7 +249,8 @@
             </div>
         </div>
     </div>
-    <!-- Snackbar Notification -->
+
+    <!-- Snackbar -->
     <div class="snackbar" id="snackbar"></div>
 
     <!-- Scripts -->
@@ -256,6 +261,48 @@
     <script src="js/stats.js"></script>
     <script src="js/controls.js"></script>
     <script src="js/settings.js"></script>
+
+    <!-- Стили для плашки [API] -->
+    <style>
+        .data-source-tag {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.4);
+            color: #ccc;
+            border: 1px solid #444;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            opacity: 0.8;
+        }
+
+        .data-source-tag::after {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            margin-left: 6px;
+            border-radius: 50%;
+            background: var(--tag-color, #ccc);
+        }
+
+        .data-source-tag[style*="API"] {
+            --tag-color: #00ff88;
+        }
+
+        .data-source-tag[style*="Telegram"] {
+            --tag-color: #00aaff;
+        }
+
+        .data-source-tag[style*="Local"] {
+            --tag-color: #ff9900;
+        }
+
+        .data-source-tag[style*="Cache"] {
+            --tag-color: #aaaaaa;
+        }
+    </style>
 </body>
 
 </html>
