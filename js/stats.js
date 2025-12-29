@@ -14,7 +14,10 @@ const safeBtoa = (str) => {
 // ✅ Надёжный createHash: юникод + совместимость
 const createHash = (userId, score, level, timestamp) => {
     const input = `${userId}:${score}:${level}:${timestamp}`;
-    return safeBtoa(input).substr(0, 20); // Первые 20 символов base64
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const binString = Array.from(data, byte => String.fromCodePoint(byte)).join('');
+    return btoa(binString).substr(0, 20);
 };
 
 const safeParse = (str) => {
@@ -438,7 +441,7 @@ const renderPersonalStats = async (container) => {
 // === UI: Открытие модалки ===
 document.getElementById('statsBtn')?.addEventListener('click', async () => {
     if (window.soundManager?.play) window.soundManager.play('click');
-    
+
     // Поставить на паузу
     if (isGameRunning && !isPaused) {
         togglePause();
