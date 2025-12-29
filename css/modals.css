@@ -502,7 +502,7 @@
 
 .theme-option.active {
     border-color: var(--modal-border-color);
-    box-shadow: 
+    box-shadow:
         0 0 20px rgba(var(--modal-shadow-color-rgb), 0.3),
         0 0 40px var(--modal-shadow-color);
     transform: scale(1.05);
@@ -643,6 +643,12 @@
     border-color: var(--neon-green);
     background: rgba(5, 255, 161, 0.1);
     box-shadow: 0 0 20px rgba(5, 255, 161, 0.2);
+}
+
+.leaderboard-item.deleted {
+    opacity: 0.5;
+    font-size: 14px;
+    filter: grayscale(100%);
 }
 
 .rank {

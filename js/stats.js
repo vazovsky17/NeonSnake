@@ -386,6 +386,7 @@ const savePersonalStats = async (stats) => {
 };
 
 // === Рендер лидерборда ===
+// === Рендер лидерборда ===
 const renderLeaderboard = (leaderboard, container) => {
     if (!container) return;
 
@@ -403,16 +404,21 @@ const renderLeaderboard = (leaderboard, container) => {
     leaderboard.slice(0, 50).forEach((entry, index) => {
         const rank = index + 1;
         const isYou = entry.userId === APP_USER_ID;
+
+        // Проверяем, удалён ли пользователь
+        const isDeleted = entry.deletedAt || (entry.score === 0 && entry.timestamp < Date.now() - 60000);
+        const displayName = isDeleted ? '[deleted]' : entry.name;
+
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
         html += `
-            <div class="leaderboard-item ${isYou ? 'current-user' : ''}">
+            <div class="leaderboard-item ${isYou ? 'current-user' : ''} ${isDeleted ? 'deleted' : ''}">
                 <div class="rank" style="color:${rank <= 3 ? 'var(--neon-yellow)' : ''}">${medal}</div>
                 <div class="player-info">
-                    <div class="player-name">${entry.name}${isYou ? ' (You)' : ''}</div>
-                    <div class="player-level">Level ${entry.level}</div>
+                    <div class="player-name">${isDeleted ? '<span style="opacity: 0.5; font-style: italic;">[deleted]</span>' : displayName}${isYou && !isDeleted ? ' (You)' : ''}</div>
+                    ${isDeleted ? '' : `<div class="player-level">Level ${entry.level}</div>`}
                 </div>
-                <div class="player-score">${entry.score.toLocaleString()}</div>
+                <div class="player-score">${isDeleted ? '-' : entry.score.toLocaleString()}</div>
             </div>
         `;
     });
