@@ -1,14 +1,177 @@
-// === 🛑 Сброс с модальным подтверждением поверх экрана ===
-function resetAllData() {
-    // Если уже есть — не создаём повторно
-    if (document.getElementById('resetModal')) {
-        return;
+// === 🛠 Глобальные настройки приложения ===
+window.appSettings = {
+    sound: true,
+    vibration: true,
+    theme: 'neon',
+    showArrows: true,
+    volume: 80  // громкость в процентах
+};
+
+// === 🔧 Загрузка настроек из localStorage ===
+const loadAppSettings = () => {
+    try {
+        const stored = JSON.parse(localStorage.getItem('appSettings') || '{}');
+        const settings = {
+            sound: stored.sound !== false,
+            vibration: stored.vibration !== false,
+            theme: stored.theme || 'neon',
+            showArrows: stored.showArrows !== false,
+            volume: Number(stored.volume) || 80
+        };
+
+        window.appSettings = settings;
+
+        // Применяем тему
+        document.documentElement.setAttribute('data-theme', settings.theme);
+
+        // Применяем видимость стрелок
+        const controls = document.querySelector('.controls');
+        if (controls) {
+            controls.style.display = settings.showArrows ? 'grid' : 'none';
+        }
+
+        // Применяем громкость
+        if (window.soundManager && typeof window.soundManager.setVolume === 'function') {
+            window.soundManager.setVolume(settings.volume / 100);
+        }
+
+        // Восстанавливаем UI
+        restoreSettingsUI(settings);
+    } catch (e) {
+        console.warn('Failed to load settings', e);
+        // Дефолтные настройки
+        window.appSettings = { sound: true, vibration: true, theme: 'neon', showArrows: true, volume: 80 };
+        document.documentElement.setAttribute('data-theme', 'neon');
     }
+};
+
+// === 🔄 Восстановление UI — привязка событий к элементам настроек ===
+const restoreSettingsUI = (settings) => {
+    console.log('🔧 restoreSettingsUI вызван с:', settings);
+
+    const soundToggle = document.getElementById('soundToggle');
+    const vibrationToggle = document.getElementById('vibrationToggle');
+    const showArrowsToggle = document.getElementById('showArrowsCheckbox');
+    const volumeRange = document.getElementById('volumeRange');
+    const volumeValue = document.getElementById('volumeValue');
+
+    if (!soundToggle) console.warn('❌ #soundToggle не найден');
+    if (!vibrationToggle) console.warn('❌ #vibrationToggle не найден');
+    if (!showArrowsToggle) console.warn('❌ #showArrowsCheckbox не найден');
+    if (!volumeRange) console.warn('❌ #volumeRange не найден');
+    if (!volumeValue) console.warn('❌ #volumeValue не найден');
+
+    // === Звук ===
+    if (soundToggle) {
+        soundToggle.checked = settings.sound;
+        soundToggle.onchange = () => {
+            window.appSettings.sound = soundToggle.checked;
+            saveAppSettings();
+            console.log('🔊 Sound:', window.appSettings.sound);
+        };
+    }
+
+    // === Вибрация ===
+    if (vibrationToggle) {
+        vibrationToggle.checked = settings.vibration;
+        vibrationToggle.onchange = () => {
+            window.appSettings.vibration = vibrationToggle.checked;
+            saveAppSettings();
+            console.log('📱 Vibration:', window.appSettings.vibration);
+        };
+    }
+
+    // === Показ стрелок ===
+    if (showArrowsToggle) {
+        showArrowsToggle.checked = settings.showArrows;
+        showArrowsToggle.onchange = () => {
+            const controls = document.querySelector('.controls');
+            const newValue = showArrowsToggle.checked;
+            window.appSettings.showArrows = newValue;
+            if (controls) {
+                controls.style.display = newValue ? 'grid' : 'none';
+            }
+            saveAppSettings();
+            console.log('➡️ Arrows:', newValue ? 'visible' : 'hidden');
+        };
+    }
+
+    // === Громкость ===
+    if (volumeRange && volumeValue) {
+        volumeRange.value = settings.volume;
+        volumeValue.textContent = `${settings.volume}%`;
+
+        // Отображаем значение при движении
+        volumeRange.oninput = () => {
+            volumeValue.textContent = `${volumeRange.value}%`;
+        };
+
+        // Сохраняем при отпускании
+        volumeRange.onchange = () => {
+            const value = Number(volumeRange.value);
+            window.appSettings.volume = value;
+            saveAppSettings();
+
+            // Применяем громкость
+            if (window.soundManager && typeof window.soundManager.setVolume === 'function') {
+                window.soundManager.setVolume(value / 100);
+            }
+
+            console.log('🔊 Volume set to:', value + '%');
+        };
+    }
+};
+
+// === 💾 Сохранение настроек в localStorage ===
+const saveAppSettings = () => {
+    try {
+        localStorage.setItem('appSettings', JSON.stringify(window.appSettings));
+    } catch (e) {
+        console.warn('Failed to save settings', e);
+    }
+};
+
+// === 🎯 Открытие модалки настроек ===
+document.getElementById('settingsBtn')?.addEventListener('click', () => {
+    const tg = window.Telegram?.WebApp;
+
+    // Звук и вибрация (если включены)
+    if (window.soundManager?.play && window.appSettings?.sound) {
+        window.soundManager.play('click');
+    }
+    if (window.appSettings?.vibration && tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
+    }
+
+    // Поставить на паузу, если игра запущена
+    if (window.isGameRunning && !window.isPaused && typeof window.togglePause === 'function') {
+        window.togglePause();
+    }
+
+    // Показать модалку
+    document.getElementById('settingsModal')?.classList.add('show');
+});
+
+// === ❌ Закрытие модалки ===
+document.getElementById('settingsCloseBtn')?.addEventListener('click', () => {
+    document.getElementById('settingsModal')?.classList.remove('show');
+});
+
+// Закрытие по клику на фон
+document.getElementById('settingsModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'settingsModal') {
+        document.getElementById('settingsModal')?.classList.remove('show');
+    }
+});
+
+// === 🗑️ Сброс всех данных ===
+function resetAllData() {
+    if (document.getElementById('resetModal')) return;
 
     const tg = window.Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id || '';
 
-    // --- Создаём модальное окно ---
+    // --- Создание модалки подтверждения ---
     const modal = document.createElement('div');
     modal.id = 'resetModal';
     modal.style = `
@@ -68,7 +231,6 @@ function resetAllData() {
     modal.appendChild(dialog);
     document.body.appendChild(modal);
 
-    // --- Элементы ---
     const input = document.getElementById('resetInput');
     const button = document.getElementById('confirmResetBtn');
     const timerSeconds = dialog.querySelector('#resetTimer strong');
@@ -80,12 +242,11 @@ function resetAllData() {
         dialog.style.transform = 'scale(1)';
     }, 10);
 
-    // --- Таймер ---
+    // --- Таймер авто-отмены ---
     let timeLeft = 10;
     const timer = setInterval(() => {
         timeLeft--;
         timerSeconds.textContent = timeLeft;
-
         if (timeLeft <= 0) {
             clearInterval(timer);
             closeResetModal();
@@ -95,24 +256,22 @@ function resetAllData() {
         }
     }, 1000);
 
-    // --- Ввод ---
+    // --- Ввод текста для подтверждения ---
     input.addEventListener('input', () => {
-        const value = input.value.trim();
-        if (value === 'RESET') {
-            button.disabled = false;
+        button.disabled = input.value.trim() !== 'RESET';
+        if (!button.disabled) {
             button.style.opacity = '1';
             button.style.cursor = 'pointer';
             button.style.background = '#600';
         } else {
-            button.disabled = true;
             button.style.opacity = '0.5';
             button.style.cursor = 'not-allowed';
             button.style.background = '#330000';
         }
     });
 
-    // --- Подтверждение ---
-    button.addEventListener('click', async () => {
+    // --- Подтверждение сброса ---
+    button.addEventListener('click', () => {
         clearInterval(timer);
         closeResetModal();
 
@@ -127,7 +286,7 @@ function resetAllData() {
                 `user_stats_${userId}`
             ].forEach(key => localStorage.removeItem(key));
 
-            // 2. Очистка Telegram Cloud
+            // 2. Очистка облака (если есть)
             if (typeof window.saveToCloud === 'function') {
                 window.saveToCloud('snakeLeaderboard', null);
                 window.saveToCloud('appSettings', null);
@@ -160,7 +319,7 @@ function resetAllData() {
                 tg.HapticFeedback.notificationOccurred('error');
             }
 
-            // 7. Закрытие настроек
+            // 7. Закрыть модалку настроек
             document.getElementById('settingsModal')?.classList.remove('show');
 
         } catch (err) {
@@ -171,13 +330,10 @@ function resetAllData() {
         }
     });
 
-    // --- Закрытие ---
     function closeResetModal() {
         modal.style.opacity = '0';
         dialog.style.transform = 'scale(0.95)';
-        setTimeout(() => {
-            modal.remove();
-        }, 300);
+        setTimeout(() => modal.remove(), 300);
     }
 
     // Закрытие по клику вне
@@ -188,10 +344,9 @@ function resetAllData() {
         }
     });
 
-    // Фокус на ввод
     input.focus();
 
-    // Звук и вибрация
+    // Вибрация и звук при открытии
     if (window.appSettings?.vibration && tg?.HapticFeedback) {
         tg.HapticFeedback.notificationOccurred('warning');
     }
@@ -199,3 +354,11 @@ function resetAllData() {
         window.soundManager.play('error');
     }
 }
+
+// === 🔗 Привязка кнопки сброса ===
+document.getElementById('resetDataBtn')?.addEventListener('click', resetAllData);
+
+// === 📦 Инициализация при загрузке DOM ===
+document.addEventListener('DOMContentLoaded', () => {
+    loadAppSettings();
+});
