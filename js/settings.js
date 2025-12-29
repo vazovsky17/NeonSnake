@@ -95,7 +95,6 @@ function saveSetting(key, value) {
     syncToCloud();
 }
 
-// === 🧹 Полная очистка: всё подряд ===
 // === 🛑 Сброс с подтверждением через ввод "RESET" и таймером исчезновения ===
 function resetAllData() {
     const modal = document.getElementById('settingsModal');

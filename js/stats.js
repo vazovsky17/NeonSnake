@@ -11,15 +11,10 @@ const safeBtoa = (str) => {
     }
 };
 
+// ✅ Надёжный createHash: юникод + совместимость
 const createHash = (userId, score, level, timestamp) => {
     const input = `${userId}:${score}:${level}:${timestamp}`;
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(input);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary).substr(0, 20);
+    return safeBtoa(input).substr(0, 20); // Первые 20 символов base64
 };
 
 const safeParse = (str) => {
@@ -31,7 +26,7 @@ const safeParse = (str) => {
     }
 };
 
-// === Telegram User ===
+// === Telegram User (с проверкой) ===
 const getTelegramUser = () => {
     const tg = window.Telegram?.WebApp;
     return tg?.initDataUnsafe?.user || null;
@@ -66,12 +61,13 @@ const MIN_SAVE_INTERVAL = 10000;
 const loadLeaderboard = async () => {
     const now = Date.now();
     if (cachedLeaderboard && now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL) {
+        console.log('Leaderboard: using cache');
         cachedLeaderboard._source = 'Cache';
         return cachedLeaderboard;
     }
 
+    console.log('Loading leaderboard from API...');
     let leaderboard = [];
-    let source = 'API';
 
     try {
         const res = await fetch(`${API_URL}/api/leaderboard`, {
@@ -84,42 +80,48 @@ const loadLeaderboard = async () => {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
+                console.log('Leaderboard loaded from API:', leaderboard.length, 'players');
                 if (typeof showSnackbar === 'function') {
-                    if (leaderboard.length === 0) {
-                        showSnackbar('No scores yet', 'info');
-                    } else {
-                        showSnackbar(`Top ${leaderboard.length} players loaded`, 'success');
-                    }
+                    leaderboard.length > 0
+                        ? showSnackbar(`Top ${leaderboard.length} players loaded`, 'success')
+                        : showSnackbar('No scores yet', 'info');
                 }
+            } else {
+                console.warn('Leaderboard not array:', data);
             }
         } else {
-            throw new Error('API error');
+            console.warn('API error:', res.status, res.statusText);
         }
     } catch (e) {
-        console.warn('API leaderboard failed', e);
+        console.error('API leaderboard failed:', e);
         if (cachedLeaderboard) {
+            console.log('Returning stale cache');
             cachedLeaderboard._source = 'Cache (stale)';
             return cachedLeaderboard;
         }
-        return []; // Если API недоступен и кэша нет — пусто
     }
 
+    // Сортируем и ограничиваем
     const sorted = leaderboard
         .sort((a, b) => b.score - a.score)
         .slice(0, 100);
 
     cachedLeaderboard = sorted;
     cachedLeaderboardTimestamp = now;
-    sorted._source = source;
+    sorted._source = 'API';
     return sorted;
 };
 
-// === Загрузка личной статистики: API → Telegram Cloud → LocalStorage → Cache ===
+// === Загрузка личной статистики: API → Fallback → Cache ===
 const loadPersonalStats = async () => {
-    if (!APP_USER_ID) return null;
+    if (!APP_USER_ID) {
+        console.log('No Telegram user → no personal stats');
+        return null;
+    }
 
     const now = Date.now();
     if (cachedPersonalStats && now - cachedPersonalStatsTimestamp < PERSONAL_STATS_CACHE_TTL) {
+        console.log('Personal stats: cache hit');
         cachedPersonalStats._source = 'Cache';
         return cachedPersonalStats;
     }
@@ -146,43 +148,29 @@ const loadPersonalStats = async () => {
                 deleted: !!data.deletedAt
             };
             source = 'API';
+            console.log('Loaded from API:', stats);
             if (typeof showSnackbar === 'function') {
                 showSnackbar('Stats loaded from server', 'success');
             }
         }
     } catch (e) {
-        console.warn('API /score failed', e);
+        console.warn('API /score failed:', e);
     }
 
-    // 2. Telegram Cloud (резерв)
-    if (!stats) {
-        try {
-            const data = await new Promise((resolve) => {
-                if (window.loadFromCloud) {
-                    window.loadFromCloud(`user_stats_${APP_USER_ID}`, (d) => resolve(d));
-                } else {
-                    resolve(null);
-                }
-            });
-            const parsed = safeParse(data);
-            if (parsed && parsed.highScore !== undefined) {
-                stats = parsed;
-                source = 'Telegram';
-            }
-        } catch (e) { }
-    }
-
-    // 3. LocalStorage (резерв)
+    // 2. Fallback: LocalStorage
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
             const totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
             const totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
-            if (highScore || totalGames || totalScore) {
+            if (highScore > 0 || totalGames > 0) {
                 stats = { highScore, totalGames, totalScore, lastUpdated: now };
                 source = 'Local';
+                console.log('Loaded from localStorage:', stats);
             }
-        } catch (e) { }
+        } catch (e) {
+            console.warn('LocalStorage read failed:', e);
+        }
     }
 
     cachedPersonalStats = stats;
@@ -191,41 +179,54 @@ const loadPersonalStats = async () => {
     return stats;
 };
 
-// === Сохранение результата ===
+// === Сохранение результата на сервер ===
 const saveScoreToLeaderboard = async (score, level) => {
     if (!APP_USER_ID || !APP_USERNAME) {
-        if (typeof showSnackbar === 'function') showSnackbar('Guest can\'t save', 'info');
+        console.log('Cannot save: no Telegram user');
+        if (typeof showSnackbar === 'function') showSnackbar('Not logged in', 'info');
         return;
     }
 
     const now = Date.now();
     if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
+        console.log('Spam protection: wait before saving');
         if (typeof showSnackbar === 'function') showSnackbar('Wait before saving...', 'warning');
         return;
     }
 
+    // Нормализуем данные
+    score = Math.max(0, Number(score) || 0);
+    level = Math.max(1, Number(level) || 1);
+
     const timestamp = now;
     const hash = createHash(APP_USER_ID, score, level, timestamp);
     const userData = { userId: APP_USER_ID, name: APP_USERNAME, score, level, timestamp, hash };
+
+    console.log('Saving to server:', userData);
 
     try {
         const res = await fetch(`${API_URL}/api/score`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
             body: JSON.stringify(userData),
-            cache: 'no-cache'
+            mode: 'cors'
         });
 
+        console.log('Server response:', res.status);
+
         if (res.ok) {
+            console.log('✅ Score saved successfully');
             cachedPersonalStats = null;
             cachedLeaderboard = null;
             lastSaveTime = now;
+
             if (typeof showSnackbar === 'function') {
                 showSnackbar(`✅ Score saved: ${score}`, 'success');
             }
         } else {
             const errorData = await res.json().catch(() => ({}));
             const errorMsg = errorData.error || res.statusText;
+            console.warn('Server error:', errorMsg);
 
             if (res.status === 429) {
                 if (typeof showSnackbar === 'function') showSnackbar('Too fast! Wait...', 'warning');
@@ -237,12 +238,12 @@ const saveScoreToLeaderboard = async (score, level) => {
             }
         }
     } catch (e) {
-        console.warn('Network error, saving offline', e);
+        console.error('Network error (save):', e);
         if (typeof showSnackbar === 'function') showSnackbar('Offline saved', 'info');
         await fallbackSaveToStorage(userData);
     }
 
-    // Обновить лидерборд во вкладке
+    // Обновить UI, если открыта вкладка лидерборда
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
@@ -270,7 +271,10 @@ const fallbackSaveToStorage = async (userData) => {
         // Обновляем кэш
         cachedLeaderboard = saved;
         cachedLeaderboardTimestamp = Date.now();
+
+        console.log('Saved to localStorage fallback');
     } catch (e) {
+        console.error('LocalStorage save failed:', e);
         if (typeof showSnackbar === 'function') {
             showSnackbar('Save failed', 'error');
         }
@@ -504,14 +508,14 @@ const autoSync = async () => {
             showSnackbar('✅ Synced with server', 'success');
         }
     } catch (e) {
-        console.warn('Auto-sync failed', e);
+        console.warn('Auto-sync failed:', e);
         if (typeof showSnackbar === 'function') {
             showSnackbar('No internet', 'error');
         }
     }
 };
 
-// События
+// События синхронизации
 if (window.Telegram?.WebApp) {
     window.Telegram.WebApp.onEvent('viewport_changed', (vp) => {
         if (vp.is_state_stable && vp.is_visible) autoSync();
@@ -531,7 +535,7 @@ window.resetAppCache = () => {
     cachedPersonalStatsTimestamp = 0;
 };
 
-// Экспорт
+// === Экспорт функций ===
 window.loadPersonalStats = loadPersonalStats;
 window.saveScoreToLeaderboard = saveScoreToLeaderboard;
 window.loadLeaderboard = loadLeaderboard;
