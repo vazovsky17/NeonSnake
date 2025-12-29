@@ -971,6 +971,10 @@
     transform: scale(1.02);
 }
 
+#resetConfirmation {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
 #resetConfirmation input:focus {
     border-color: var(--neon-pink);
     box-shadow: 0 0 8px rgba(255, 30, 120, 0.5);

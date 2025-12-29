@@ -96,59 +96,185 @@ function saveSetting(key, value) {
 }
 
 // === 🧹 Полная очистка: всё подряд ===
+// === 🛑 Сброс с подтверждением через ввод "RESET" и таймером исчезновения ===
 function resetAllData() {
-    if (!confirm('⚠️ Are you sure? This will delete ALL data — including cloud, settings, scores. Cannot be undone.')) {
+    const modal = document.getElementById('settingsModal');
+    const content = modal?.querySelector('.settings-content') || modal;
+
+    // Если уже показано — не создаём повторно
+    if (document.getElementById('resetConfirmation')) {
         return;
     }
 
-    const tg = window.Telegram?.WebApp;
-    const userId = tg?.initDataUnsafe?.user?.id || '';
-    const keysToDelete = [
-        'snakeHighScore',
-        'totalGames',
-        'totalScore',
-        'snakeLeaderboard',
-        'appSettings',
-        `user_stats_${userId}`
-    ];
+    const buttons = document.querySelectorAll('#resetDataBtn');
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    });
 
-    try {
-        // 1. Очищаем localStorage
-        keysToDelete.forEach(key => localStorage.removeItem(key));
+    const confirmDiv = document.createElement('div');
+    confirmDiv.id = 'resetConfirmation';
+    confirmDiv.style = `
+        margin: 20px 16px;
+        padding: 16px;
+        background: rgba(255, 0, 0, 0.1);
+        border: 1px solid var(--neon-red);
+        border-radius: 10px;
+        color: var(--neon-red);
+        font-family: 'Orbitron', sans-serif;
+        text-align: center;
+        transition: all 0.3s ease;
+    `;
 
-        // 2. Очищаем Telegram Cloud
-        if (typeof window.saveToCloud === 'function') {
-            keysToDelete.forEach(key => window.saveToCloud(key, null));
+    confirmDiv.innerHTML = `
+        <p style="margin: 0 0 12px; font-size: 14px;">
+            ⚠️ Type <strong>RESET</strong> to confirm:
+        </p>
+        <input id="resetInput" type="text" 
+               style="width: 100%; padding: 10px; margin-bottom: 10px; font: 14px 'Orbitron';
+                      text-align: center; border: 1px solid var(--neon-pink); border-radius: 6px;
+                      background: rgba(0,0,0,0.3); color: white; outline: none;"
+               placeholder="Enter RESET">
+        <button id="confirmResetBtn" disabled
+                style="padding: 8px 16px; font: bold 12px 'Orbitron'; color: #fff;
+                       background: var(--neon-red); border: 1px solid #ff3366;
+                       border-radius: 6px; cursor: not-allowed; opacity: 0.5;">
+            Delete All Data
+        </button>
+        <div id="resetTimer" style="margin-top: 8px; font-size: 12px; opacity: 0.8;">
+            Time left: <strong>10</strong> sec
+        </div>
+    `;
+
+    content.appendChild(confirmDiv);
+
+    const input = document.getElementById('resetInput');
+    const button = document.getElementById('confirmResetBtn');
+    const timerElement = document.getElementById('resetTimer');
+    const timerSeconds = timerElement.querySelector('strong');
+
+    let timeLeft = 10;
+    const timer = setInterval(() => {
+        timeLeft--;
+        timerSeconds.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            confirmDiv.style.opacity = '0';
+            confirmDiv.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                confirmDiv.remove();
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                });
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('⏱️ Reset cancelled', 'info');
+                }
+            }, 300);
         }
+    }, 1000);
 
-        // 3. Сбрасываем кэш
-        if (typeof window.resetAppCache === 'function') {
-            window.resetAppCache();
+    // Очистка таймера при закрытии модалки
+    const clearTimer = () => clearInterval(timer);
+
+    modal?.addEventListener('click', function onModalClose(e) {
+        if (e.target === modal) {
+            clearTimer();
         }
+    });
 
-        // 4. Обновляем UI
-        document.getElementById('statsContent')?.insertAdjacentHTML('afterbegin', `
-            <div style="text-align:center; color:var(--neon-blue); padding:20px;">
-                <p>🗑️ All data cleared</p>
-            </div>`);
-        document.getElementById('settingsModal')?.classList.remove('show');
+    document.getElementById('settingsCloseBtn')?.addEventListener('click', clearTimer);
 
-        // 5. Уведомление
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('🧹 All data reset!', 'info');
+    // Ввод
+    input.addEventListener('input', () => {
+        const value = input.value.trim();
+        if (value === 'RESET') {
+            button.disabled = false;
+            button.style.opacity = '1';
+            button.style.cursor = 'pointer';
+            button.style.backgroundColor = '#ff0000';
+        } else {
+            button.disabled = true;
+            button.style.opacity = '0.5';
+            button.style.cursor = 'not-allowed';
+            button.style.backgroundColor = 'var(--neon-red)';
         }
+    });
 
-        // 6. Звук и вибрация
-        if (window.soundManager?.play) window.soundManager.play('error');
-        if (window.appSettings?.vibration && tg?.HapticFeedback) {
-            tg.HapticFeedback.notificationOccurred('error');
-        }
+    button.addEventListener('click', async () => {
+        clearInterval(timer); // Останавливаем таймер
 
-    } catch (err) {
-        console.error('Reset failed', err);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Reset failed', 'error');
+        const tg = window.Telegram?.WebApp;
+        const userId = tg?.initDataUnsafe?.user?.id || '';
+
+        try {
+            // 1. Очищаем localStorage
+            [
+                'snakeHighScore',
+                'totalGames',
+                'totalScore',
+                'snakeLeaderboard',
+                'appSettings',
+                `user_stats_${userId}`
+            ].forEach(key => localStorage.removeItem(key));
+
+            // 2. Очищаем Telegram Cloud Storage
+            if (typeof window.saveToCloud === 'function') {
+                window.saveToCloud('snakeLeaderboard', null);
+                window.saveToCloud('appSettings', null);
+                window.saveToCloud(`user_stats_${userId}`, null);
+            }
+
+            // 3. Сбрасываем кэш
+            if (typeof window.resetAppCache === 'function') {
+                window.resetAppCache();
+            }
+
+            // 4. Обновляем UI
+            const statsContent = document.getElementById('statsContent');
+            if (statsContent) {
+                statsContent.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--neon-blue); opacity: 0.8;">
+                        <p style="font-family: 'Orbitron', sans-serif; font-size: 18px;">🗑️ Data Cleared</p>
+                        <p style="font-size: 14px;">Start fresh!</p>
+                    </div>`;
+            }
+
+            // 5. Уведомление
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('🧹 All data reset!', 'info');
+            }
+
+            // 6. Звук и вибрация
+            if (window.soundManager?.play) window.soundManager.play('error');
+            if (window.appSettings.vibration && tg?.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+
+            // 7. Удаляем форму
+            confirmDiv.remove();
+
+            // 8. Закрываем модалку
+            modal?.classList.remove('show');
+
+        } catch (err) {
+            console.error('Reset failed', err);
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Error resetting data', 'error');
+            }
         }
+    });
+
+    // Фокус на поле ввода
+    input.focus();
+
+    // Вибрация и звук при открытии
+    if (window.appSettings?.vibration && tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('warning');
+    }
+    if (window.soundManager?.play) {
+        window.soundManager.play('error');
     }
 }
 
