@@ -27,17 +27,13 @@ function initSettings() {
             }
         }
 
-        // Приоритет: облако > localStorage
         if (parsed) {
             window.appSettings = parsed;
             localStorage.setItem('appSettings', JSON.stringify(window.appSettings));
         }
 
-        // Применяем
         applyShowArrows(window.appSettings.showArrows);
         applyVolumeUI(window.appSettings.volume);
-
-        // Синхронизируем UI
         syncSettingsUI();
     });
 }
@@ -73,12 +69,8 @@ function applyShowArrows(value) {
 }
 
 function setRangeFill(el, percent) {
-    try {
-        if (!el) return;
-        el.style.background = `linear-gradient(90deg, var(--neon-pink) ${percent}%, rgba(255,255,255,0.06) ${percent}%)`;
-    } catch (e) {
-        console.warn('Failed to set range fill', e);
-    }
+    if (!el) return;
+    el.style.background = `linear-gradient(90deg, var(--neon-pink) ${percent}%, rgba(255,255,255,0.06) ${percent}%)`;
 }
 
 function applyVolumeUI(vol) {
@@ -96,180 +88,126 @@ function applyVolumeUI(vol) {
     }
 }
 
-// === Сохранение настройки (в localStorage + CloudStorage) ===
+// === Сохранение настройки ===
 function saveSetting(key, value) {
     window.appSettings[key] = value;
     localStorage.setItem('appSettings', JSON.stringify(window.appSettings));
     syncToCloud();
 }
 
-// === 🧹 Сброс всех данных: локально, в облаке и кэш ===
+// === 🧹 Полная очистка: всё подряд ===
 function resetAllData() {
-    if (!confirm('⚠️ Are you sure? This will delete:\n- Your high score\n- Game progress\n- Settings\n- Leaderboard\n\nThis cannot be undone.')) {
+    if (!confirm('⚠️ Are you sure? This will delete ALL data — including cloud, settings, scores. Cannot be undone.')) {
         return;
     }
 
     const tg = window.Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id || '';
+    const keysToDelete = [
+        'snakeHighScore',
+        'totalGames',
+        'totalScore',
+        'snakeLeaderboard',
+        'appSettings',
+        `user_stats_${userId}`
+    ];
 
     try {
         // 1. Очищаем localStorage
-        [
-            'snakeHighScore',
-            'totalGames',
-            'totalScore',
-            'snakeLeaderboard',
-            'appSettings',
-            `user_stats_${userId}`
-        ].forEach(key => {
-            localStorage.removeItem(key);
-        });
+        keysToDelete.forEach(key => localStorage.removeItem(key));
 
-        // 2. Очищаем Telegram Cloud Storage
+        // 2. Очищаем Telegram Cloud
         if (typeof window.saveToCloud === 'function') {
-            window.saveToCloud('snakeLeaderboard', null);
-            window.saveToCloud('appSettings', null);
-            window.saveToCloud(`user_stats_${userId}`, null);
+            keysToDelete.forEach(key => window.saveToCloud(key, null));
         }
 
-        // 3. 🧹 Сбрасываем кэш (из stats.js)
+        // 3. Сбрасываем кэш
         if (typeof window.resetAppCache === 'function') {
             window.resetAppCache();
         }
 
-        // 4. Обновляем глобальные переменные (если они в stats.js)
-        // Это важно, чтобы при следующем вызове loadLeaderboard() не вернулся старый кэш
+        // 4. Обновляем UI
+        document.getElementById('statsContent')?.insertAdjacentHTML('afterbegin', `
+            <div style="text-align:center; color:var(--neon-blue); padding:20px;">
+                <p>🗑️ All data cleared</p>
+            </div>`);
+        document.getElementById('settingsModal')?.classList.remove('show');
 
-        // 5. Сбрасываем состояние игры (если есть)
-        if (typeof window.resetGameStats === 'function') {
-            window.resetGameStats();
-        }
-
-        // 6. Обновляем UI, если открыта статистика
-        const statsContent = document.getElementById('statsContent');
-        if (statsContent) {
-            statsContent.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--neon-blue); opacity: 0.8;">
-                    <p style="font-family: 'Orbitron', sans-serif; font-size: 18px; margin-bottom: 10px;">🗑️ Data Cleared</p>
-                    <p style="font-size: 14px;">Start a new game to set a record!</p>
-                </div>`;
-        }
-
-        // 7. Показываем уведомление
+        // 5. Уведомление
         if (typeof showSnackbar === 'function') {
             showSnackbar('🧹 All data reset!', 'info');
         }
 
-        // 8. Звук и вибрация
-        if (window.soundManager && window.appSettings.sound) {
-            window.soundManager.play('error');
-        }
-        if (window.appSettings.vibration && tg?.HapticFeedback) {
+        // 6. Звук и вибрация
+        if (window.soundManager?.play) window.soundManager.play('error');
+        if (window.appSettings?.vibration && tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('error');
         }
 
-        // 9. Закрываем модалку
-        document.getElementById('settingsModal')?.classList.remove('show');
-
     } catch (err) {
-        console.error('Failed to reset data', err);
+        console.error('Reset failed', err);
         if (typeof showSnackbar === 'function') {
-            showSnackbar('Error resetting data', 'error');
+            showSnackbar('Reset failed', 'error');
         }
     }
 }
 
-// === Инициализация при загрузке ===
-window.addEventListener('load', () => {
-    initSettings();
-});
+// === Инициализация ===
+window.addEventListener('load', initSettings);
 
-// === Открытие модалки настроек ===
+// === UI ===
 document.getElementById('settingsBtn')?.addEventListener('click', () => {
     if (window.soundManager?.play) window.soundManager.play('click');
+    if (window.isGameRunning && !window.isPaused) window.togglePause();
 
-    if (window.isGameRunning && !window.isPaused && window.togglePause) {
-        window.togglePause();
-    }
-
-    const modal = document.getElementById('settingsModal');
-    if (!modal) return;
-
+    document.getElementById('settingsModal')?.classList.add('show');
     syncSettingsUI();
-    modal.classList.add('show');
 
-    const tg = window.Telegram?.WebApp;
-    if (window.appSettings?.vibration && tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('light');
+    if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
 });
 
-// === Обработчики изменений ===
-
-// Показ стрелок
+// Обработчики
 document.getElementById('showArrowsCheckbox')?.addEventListener('change', (e) => {
-    const enabled = !!e.target.checked;
+    const enabled = e.target.checked;
     saveSetting('showArrows', enabled);
     applyShowArrows(enabled);
-
-    if (window.soundManager && window.appSettings.sound) {
-        window.soundManager.play('click');
-    }
+    if (window.soundManager && window.appSettings.sound) window.soundManager.play('click');
     if (window.appSettings.vibration && window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
 });
 
-// Вибрация
 document.getElementById('vibrationCheckbox')?.addEventListener('change', (e) => {
-    const enabled = !!e.target.checked;
+    const enabled = e.target.checked;
     saveSetting('vibration', enabled);
-
     if (enabled && window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
 });
 
-// Звук
 document.getElementById('soundCheckbox')?.addEventListener('change', (e) => {
-    const enabled = !!e.target.checked;
+    const enabled = e.target.checked;
     saveSetting('sound', enabled);
-
-    const volumeRange = document.getElementById('volumeRange');
-    if (volumeRange) volumeRange.disabled = !enabled;
-
+    const r = document.getElementById('volumeRange');
+    if (r) r.disabled = !enabled;
     applyVolumeUI(window.appSettings.volume);
-
-    if (enabled && window.soundManager) {
-        window.soundManager.play('click');
-    }
+    if (enabled && window.soundManager) window.soundManager.play('click');
 });
 
-// Громкость
 document.getElementById('volumeRange')?.addEventListener('input', (e) => {
-    const val = Number(e.target.value);
-    const vol = Math.max(0, Math.min(100, val)) / 100;
-
+    const vol = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
     saveSetting('volume', vol);
     applyVolumeUI(vol);
-
-    if (window.appSettings.sound && window.soundManager) {
-        window.soundManager.play('click');
-    }
+    if (window.appSettings.sound && window.soundManager) window.soundManager.play('click');
 });
 
-// === 🟢 Кнопка сброса данных ===
 document.getElementById('resetDataBtn')?.addEventListener('click', (e) => {
-    e.stopPropagation(); // Не закрываем модалку сразу
-    if (window.soundManager?.play) window.soundManager.play('error');
-    if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
-    }
-
+    e.stopPropagation();
     resetAllData();
 });
 
-// === Закрытие модалки ===
 document.getElementById('settingsModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'settingsModal') {
         document.getElementById('settingsModal')?.classList.remove('show');
@@ -277,9 +215,7 @@ document.getElementById('settingsModal')?.addEventListener('click', (e) => {
 });
 
 document.getElementById('settingsCloseBtn')?.addEventListener('click', () => {
-    const modal = document.getElementById('settingsModal');
-    if (modal) modal.classList.remove('show');
-
+    document.getElementById('settingsModal')?.classList.remove('show');
     if (window.soundManager?.play) window.soundManager.play('click');
     if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.impactOccurred('light');

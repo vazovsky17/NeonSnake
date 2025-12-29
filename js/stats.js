@@ -31,33 +31,6 @@ const safeParse = (str) => {
     }
 };
 
-const safeSetItem = (key, value) => {
-    try {
-        localStorage.setItem(key, value);
-    } catch (e) {
-        console.warn('localStorage error', e);
-    }
-};
-
-const loadFromCloudWithTimeout = (key) => {
-    return new Promise((resolve) => {
-        if (!window.loadFromCloud) {
-            resolve(null);
-            return;
-        }
-        const timer = setTimeout(() => resolve(null), 3000);
-        try {
-            window.loadFromCloud(key, (data) => {
-                clearTimeout(timer);
-                resolve(data);
-            });
-        } catch (e) {
-            clearTimeout(timer);
-            resolve(null);
-        }
-    });
-};
-
 // === Telegram User ===
 const getTelegramUser = () => {
     const tg = window.Telegram?.WebApp;
@@ -87,9 +60,9 @@ const API_URL = 'https://neon-snake-leaderboard.vercel.app';
 
 // === Анти-спам ===
 let lastSaveTime = 0;
-const MIN_SAVE_INTERVAL = 10000; // Должно совпадать с сервером
+const MIN_SAVE_INTERVAL = 10000;
 
-// === Загрузка лидерборда: API → Cloud → LocalStorage ===
+// === Загрузка лидерборда: ТОЛЬКО API → Cache ===
 const loadLeaderboard = async () => {
     const now = Date.now();
     if (cachedLeaderboard && now - cachedLeaderboardTimestamp < LEADERBOARD_CACHE_TTL) {
@@ -98,19 +71,19 @@ const loadLeaderboard = async () => {
     }
 
     let leaderboard = [];
-    let source = 'Local';
+    let source = 'API';
 
     try {
         const res = await fetch(`${API_URL}/api/leaderboard`, {
             method: 'GET',
-            cache: 'no-cache'
+            cache: 'no-cache',
+            headers: { 'Cache-Control': 'no-cache' }
         });
 
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
-                source = 'API';
                 if (typeof showSnackbar === 'function') {
                     if (leaderboard.length === 0) {
                         showSnackbar('No scores yet', 'info');
@@ -119,31 +92,16 @@ const loadLeaderboard = async () => {
                     }
                 }
             }
+        } else {
+            throw new Error('API error');
         }
     } catch (e) {
         console.warn('API leaderboard failed', e);
-    }
-
-    if (leaderboard.length === 0) {
-        try {
-            const data = await loadFromCloudWithTimeout('leaderboard');
-            const parsed = safeParse(data);
-            if (Array.isArray(parsed)) {
-                leaderboard = parsed;
-                source = 'Telegram';
-            }
-        } catch (e) { }
-    }
-
-    if (leaderboard.length === 0) {
-        try {
-            const saved = localStorage.getItem('snakeLeaderboard');
-            const parsed = safeParse(saved);
-            if (Array.isArray(parsed)) {
-                leaderboard = parsed;
-                source = 'Local';
-            }
-        } catch (e) { }
+        if (cachedLeaderboard) {
+            cachedLeaderboard._source = 'Cache (stale)';
+            return cachedLeaderboard;
+        }
+        return []; // Если API недоступен и кэша нет — пусто
     }
 
     const sorted = leaderboard
@@ -156,7 +114,7 @@ const loadLeaderboard = async () => {
     return sorted;
 };
 
-// === Загрузка личной статистики ===
+// === Загрузка личной статистики: API → Telegram Cloud → LocalStorage → Cache ===
 const loadPersonalStats = async () => {
     if (!APP_USER_ID) return null;
 
@@ -169,6 +127,7 @@ const loadPersonalStats = async () => {
     let stats = null;
     let source = 'Local';
 
+    // 1. API
     try {
         const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`, {
             method: 'GET',
@@ -195,10 +154,17 @@ const loadPersonalStats = async () => {
         console.warn('API /score failed', e);
     }
 
+    // 2. Telegram Cloud (резерв)
     if (!stats) {
         try {
-            const cloud = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
-            const parsed = safeParse(cloud);
+            const data = await new Promise((resolve) => {
+                if (window.loadFromCloud) {
+                    window.loadFromCloud(`user_stats_${APP_USER_ID}`, (d) => resolve(d));
+                } else {
+                    resolve(null);
+                }
+            });
+            const parsed = safeParse(data);
             if (parsed && parsed.highScore !== undefined) {
                 stats = parsed;
                 source = 'Telegram';
@@ -206,6 +172,7 @@ const loadPersonalStats = async () => {
         } catch (e) { }
     }
 
+    // 3. LocalStorage (резерв)
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
@@ -224,7 +191,7 @@ const loadPersonalStats = async () => {
     return stats;
 };
 
-// === Сохранение результата в лидерборд ===
+// === Сохранение результата ===
 const saveScoreToLeaderboard = async (score, level) => {
     if (!APP_USER_ID || !APP_USERNAME) {
         if (typeof showSnackbar === 'function') showSnackbar('Guest can\'t save', 'info');
@@ -239,7 +206,6 @@ const saveScoreToLeaderboard = async (score, level) => {
 
     const timestamp = now;
     const hash = createHash(APP_USER_ID, score, level, timestamp);
-
     const userData = { userId: APP_USER_ID, name: APP_USERNAME, score, level, timestamp, hash };
 
     try {
@@ -276,6 +242,7 @@ const saveScoreToLeaderboard = async (score, level) => {
         await fallbackSaveToStorage(userData);
     }
 
+    // Обновить лидерборд во вкладке
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
@@ -287,45 +254,25 @@ const saveScoreToLeaderboard = async (score, level) => {
     }
 };
 
-// === Fallback сохранение ===
+// === Fallback: только локально ===
 const fallbackSaveToStorage = async (userData) => {
     if (!userData.userId) return;
 
     try {
-        const leaderboard = await loadLeaderboard();
-        const index = leaderboard.findIndex(p => p.userId === userData.userId);
-        const updated = [...leaderboard];
+        const local = safeParse(localStorage.getItem('snakeLeaderboard')) || [];
+        const filtered = local.filter(p => p.userId !== userData.userId);
+        filtered.push(userData);
+        const saved = filtered
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 100);
+        localStorage.setItem('snakeLeaderboard', JSON.stringify(saved));
 
-        if (index === -1 || userData.score > (updated[index]?.score || 0)) {
-            if (index === -1) {
-                updated.push(userData);
-            } else {
-                updated[index] = userData;
-            }
-
-            const final = updated
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 100);
-
-            if (typeof window.saveToCloud === 'function') {
-                window.saveToCloud('leaderboard', JSON.stringify(final));
-            }
-            safeSetItem('snakeLeaderboard', JSON.stringify(final));
-
-            cachedLeaderboard = final;
-            cachedLeaderboardTimestamp = Date.now();
-        }
+        // Обновляем кэш
+        cachedLeaderboard = saved;
+        cachedLeaderboardTimestamp = Date.now();
     } catch (e) {
-        try {
-            const local = safeParse(localStorage.getItem('snakeLeaderboard')) || [];
-            const filtered = local.filter(p => p.userId !== userData.userId);
-            filtered.push(userData);
-            const saved = filtered
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 100);
-            safeSetItem('snakeLeaderboard', JSON.stringify(saved));
-        } catch (e2) {
-            if (typeof showSnackbar === 'function') showSnackbar('Save failed', 'error');
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Save failed', 'error');
         }
     }
 };
@@ -334,7 +281,7 @@ const fallbackSaveToStorage = async (userData) => {
 const renderLeaderboard = (leaderboard, container) => {
     if (!container) return;
 
-    const source = leaderboard._source || 'Local';
+    const source = leaderboard._source || 'Cache';
 
     if (!Array.isArray(leaderboard) || leaderboard.length === 0) {
         container.innerHTML = `
@@ -367,10 +314,8 @@ const renderLeaderboard = (leaderboard, container) => {
                 <div class="rank" style="color:${rank <= 3 ? 'var(--neon-yellow)' : ''}">${medal}</div>
                 <div class="player-info">
                     <div class="player-name">
-                        ${isDeleted
-                ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
-                : displayName}
-                        ${!isDeleted && isYou ? ' <span style="color:var(--neon-cyan); font-size:12px;">(You)</span>' : ''}
+                        ${isDeleted ? '<span style="opacity:0.6;font-style:italic;">[deleted]</span>' : displayName}
+                        ${!isDeleted && isYou ? ' <span style="color:var(--neon-cyan);font-size:12px;">(You)</span>' : ''}
                     </div>
                     ${isDeleted ? '' : `<div class="player-level">Level ${entry.level}</div>`}
                 </div>
@@ -460,14 +405,11 @@ const renderPersonalStats = async (container) => {
         ${syncButtonHtml}
     `;
 
-    // Обработчик кнопки Sync Now
     document.getElementById('syncNowBtn')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (window.soundManager?.play) window.soundManager.play('click');
-
-        const tg = window.Telegram?.WebApp;
-        if (window.appSettings?.vibration && tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('medium');
+        if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
         }
 
         const btn = document.getElementById('syncNowBtn');
@@ -516,7 +458,7 @@ document.getElementById('statsBtn')?.addEventListener('click', async () => {
     }
 });
 
-// === Переключение вкладок ===
+// Переключение вкладок
 document.querySelectorAll('.stats-tab').forEach(tab => {
     tab.addEventListener('click', async () => {
         document.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
@@ -532,25 +474,24 @@ document.querySelectorAll('.stats-tab').forEach(tab => {
     });
 });
 
-// === Закрытие модалки ===
+// Закрытие модалки
 document.getElementById('statsCloseBtn')?.addEventListener('click', () => {
     document.getElementById('statsModal')?.classList.remove('show');
 });
-
 document.getElementById('statsModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'statsModal') {
         e.target.classList.remove('show');
     }
 });
 
-// === Авто-синхронизация при возврате в приложение ===
+// === Авто-синхронизация ===
 const autoSync = async () => {
     if (!APP_USER_ID) return;
 
     try {
-        const localLeaderboard = safeParse(localStorage.getItem('snakeLeaderboard'));
-        if (Array.isArray(localLeaderboard)) {
-            const userScore = localLeaderboard.find(p => p.userId === APP_USER_ID);
+        const local = safeParse(localStorage.getItem('snakeLeaderboard'));
+        if (Array.isArray(local)) {
+            const userScore = local.find(p => p.userId === APP_USER_ID);
             if (userScore) {
                 await saveScoreToLeaderboard(userScore.score, userScore.level);
             }
@@ -570,28 +511,27 @@ const autoSync = async () => {
     }
 };
 
-// Подписка на события
+// События
 if (window.Telegram?.WebApp) {
     window.Telegram.WebApp.onEvent('viewport_changed', (vp) => {
         if (vp.is_state_stable && vp.is_visible) autoSync();
     });
     window.Telegram.WebApp.onEvent('focus', autoSync);
 }
-
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') setTimeout(autoSync, 500);
 });
 window.addEventListener('focus', () => setTimeout(autoSync, 500));
 
-// === Экспорт функций ===
-window.loadPersonalStats = loadPersonalStats;
-window.savePersonalStats = savePersonalStats;
-window.saveScoreToLeaderboard = saveScoreToLeaderboard;
-window.loadLeaderboard = loadLeaderboard;
-
+// === Сброс кэша ===
 window.resetAppCache = () => {
     cachedLeaderboard = null;
     cachedLeaderboardTimestamp = 0;
     cachedPersonalStats = null;
     cachedPersonalStatsTimestamp = 0;
 };
+
+// Экспорт
+window.loadPersonalStats = loadPersonalStats;
+window.saveScoreToLeaderboard = saveScoreToLeaderboard;
+window.loadLeaderboard = loadLeaderboard;
