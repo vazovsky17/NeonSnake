@@ -505,10 +505,6 @@ document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
     shareScore();
 });
 
-document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
-    shareScore();
-});
-
 // === UI & Safe Area ===
 updateUI();
 
@@ -529,11 +525,21 @@ if (typeof tg.disableVerticalSwipes === 'function') {
     try { tg.disableVerticalSwipes(); } catch (e) { console.warn('disableVerticalSwipes failed', e); }
 }
 
-// === Загрузка статистики после инициализации ===
+// === Инициализация UI и обработчиков ===
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (typeof initPersonalStats === 'function') {
             initPersonalStats();
         }
     }, 200);
+
+    document.getElementById('startBtn')?.addEventListener('click', () => {
+        startGame();
+        if (window.soundManager?.play && window.appSettings?.sound) {
+            window.soundManager.play('click');
+        }
+        if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
+    });
 });
