@@ -127,7 +127,7 @@ const updateUI = () => {
     const scoreNeeded = nextLevelScore - currentLevelScore;
     const progress = Math.min(100, (scoreInLevel / scoreNeeded) * 100);
 
-    document.getElementById('levelProgressText').textContent = `${scoreInLine}/${scoreNeeded}`;
+    document.getElementById('levelProgressText').textContent = `${scoreInLevel}/${scoreNeeded}`;
     document.getElementById('progressBar').style.width = `${progress}%`;
 };
 
