@@ -947,3 +947,26 @@
         font-size: 11px;
     }
 }
+
+.danger-btn {
+    display: block;
+    width: 100%;
+    margin: 20px auto 10px;
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--neon-red);
+    font: bold 13px 'Orbitron';
+    border: 1px solid var(--neon-red);
+    border-radius: 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+}
+
+.danger-btn:hover {
+    background: rgba(255, 0, 0, 0.1);
+    box-shadow: 0 0 16px rgba(255, 0, 0, 0.4);
+    transform: scale(1.02);
+}

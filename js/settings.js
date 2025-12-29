@@ -8,17 +8,18 @@ window.appSettings = JSON.parse(localStorage.getItem('appSettings') || 'null') |
 
 // === Синхронизация: localStorage → CloudStorage ===
 function syncToCloud() {
-    window.saveToCloud('appSettings', JSON.stringify(window.appSettings));
+    if (typeof window.saveToCloud === 'function') {
+        window.saveToCloud('appSettings', JSON.stringify(window.appSettings));
+    }
 }
 
 // === Инициализация: сначала CloudStorage, потом fallback ===
 function initSettings() {
-     window.loadFromCloud('appSettings', (cloudValue) => {
+    window.loadFromCloud('appSettings', (cloudValue) => {
         let parsed = null;
         if (cloudValue) {
             try {
                 parsed = JSON.parse(cloudValue);
-                // Валидация
                 if (typeof parsed !== 'object' || parsed === null) throw new Error('Invalid JSON');
             } catch (e) {
                 console.warn('Failed to parse cloud settings', e);
@@ -29,9 +30,8 @@ function initSettings() {
         // Приоритет: облако > localStorage
         if (parsed) {
             window.appSettings = parsed;
-            localStorage.setItem('appSettings', JSON.stringify(window.appSettings)); // синхронизируем локально
+            localStorage.setItem('appSettings', JSON.stringify(window.appSettings));
         }
-        // Если нет в облаке — уже есть localStorage или значения по умолчанию
 
         // Применяем
         applyShowArrows(window.appSettings.showArrows);
@@ -100,29 +100,91 @@ function applyVolumeUI(vol) {
 function saveSetting(key, value) {
     window.appSettings[key] = value;
     localStorage.setItem('appSettings', JSON.stringify(window.appSettings));
-    syncToCloud(); // отправляем в облако
+    syncToCloud();
+}
+
+// === 🟢 Сброс всех данных (локальных + Telegram Cloud) ===
+function resetAllData() {
+    if (!confirm('⚠️ Are you sure? This will delete:\n- Your high score\n- Game progress\n- Settings\n\nThis cannot be undone.')) {
+        return;
+    }
+
+    const tg = window.Telegram?.WebApp;
+
+    try {
+        // 1. Очищаем localStorage
+        localStorage.removeItem('snakeHighScore');
+        localStorage.removeItem('totalGames');
+        localStorage.removeItem('totalScore');
+        localStorage.removeItem('snakeLeaderboard');
+        localStorage.removeItem('appSettings');
+        localStorage.removeItem('user_stats_' + (window.Telegram?.WebApp?.initDataUnsafe?.user?.id || ''));
+
+        // 2. Очищаем Telegram Cloud Storage
+        if (typeof window.saveToCloud === 'function') {
+            window.saveToCloud('snakeLeaderboard', null);
+            window.saveToCloud('appSettings', null);
+            window.saveToCloud('user_stats_' + (window.Telegram?.WebApp?.initDataUnsafe?.user?.id || ''), null);
+        }
+
+        // 3. Сбрасываем кэш в stats.js
+        if (typeof window.loadLeaderboard === 'function') {
+            window.loadLeaderboard = () => Promise.resolve([]);
+        }
+        if (typeof window.loadPersonalStats === 'function') {
+            window.loadPersonalStats = () => Promise.resolve(null);
+        }
+
+        // 4. Уведомление
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('🧹 Data reset!', 'info');
+        }
+
+        // 5. Звук и вибрация
+        if (window.soundManager && window.appSettings.sound) {
+            window.soundManager.play('error');
+        }
+        if (window.appSettings.vibration && tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('error');
+        }
+
+        // 6. Закрываем модалку
+        document.getElementById('settingsModal')?.classList.remove('show');
+
+        // 7. Обновляем UI (если есть stats)
+        if (document.getElementById('statsContent')) {
+            document.getElementById('statsContent').innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No data yet</div>';
+        }
+
+    } catch (err) {
+        console.error('Failed to reset data', err);
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('Error resetting data', 'error');
+        }
+    }
 }
 
 // === Инициализация при загрузке ===
 window.addEventListener('load', () => {
-    initSettings(); // загружаем из облака → локально
+    initSettings();
 });
 
 // === Открытие модалки настроек ===
-document.getElementById('settingsBtn').addEventListener('click', () => {
-    if (window.soundManager) window.soundManager.play('click');
+document.getElementById('settingsBtn')?.addEventListener('click', () => {
+    if (window.soundManager?.play) window.soundManager.play('click');
 
-    if (isGameRunning && !isPaused) {
-        togglePause();
+    if (window.isGameRunning && !window.isPaused && window.togglePause) {
+        window.togglePause();
     }
 
     const modal = document.getElementById('settingsModal');
     if (!modal) return;
 
-    syncSettingsUI(); // обновляем UI
+    syncSettingsUI();
     modal.classList.add('show');
 
-    if (window.appSettings.vibration && tg?.HapticFeedback) {
+    const tg = window.Telegram?.WebApp;
+    if (window.appSettings?.vibration && tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
 });
@@ -130,88 +192,81 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
 // === Обработчики изменений ===
 
 // Показ стрелок
-const showArrowsCheckbox = document.getElementById('showArrowsCheckbox');
-if (showArrowsCheckbox) {
-    showArrowsCheckbox.addEventListener('change', (e) => {
-        const enabled = !!e.target.checked;
-        saveSetting('showArrows', enabled);
-        applyShowArrows(enabled);
+document.getElementById('showArrowsCheckbox')?.addEventListener('change', (e) => {
+    const enabled = !!e.target.checked;
+    saveSetting('showArrows', enabled);
+    applyShowArrows(enabled);
 
-        if (window.soundManager && window.appSettings.sound) {
-            window.soundManager.play('click');
-        }
-        if (window.appSettings.vibration && tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('light');
-        }
-    });
-}
-
-// Вибрация
-const vibrationCheckbox = document.getElementById('vibrationCheckbox');
-if (vibrationCheckbox) {
-    vibrationCheckbox.addEventListener('change', (e) => {
-        const enabled = !!e.target.checked;
-        saveSetting('vibration', enabled);
-
-        if (enabled && tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('light');
-        }
-    });
-}
-
-// Звук
-const soundCheckbox = document.getElementById('soundCheckbox');
-if (soundCheckbox) {
-    soundCheckbox.addEventListener('change', (e) => {
-        const enabled = !!e.target.checked;
-        saveSetting('sound', enabled);
-
-        const volumeRange = document.getElementById('volumeRange');
-        if (volumeRange) volumeRange.disabled = !enabled;
-
-        applyVolumeUI(window.appSettings.volume);
-
-        if (enabled && window.soundManager) {
-            window.soundManager.play('click');
-        }
-    });
-}
-
-// Громкость
-const volumeRangeEl = document.getElementById('volumeRange');
-if (volumeRangeEl) {
-    volumeRangeEl.addEventListener('input', (e) => {
-        const val = Number(e.target.value);
-        const vol = Math.max(0, Math.min(100, val)) / 100;
-
-        saveSetting('volume', vol);
-        applyVolumeUI(vol);
-
-        if (window.appSettings.sound && window.soundManager) {
-            window.soundManager.play('click');
-        }
-    });
-}
-
-// === Закрытие модалки ===
-
-// Клик вне
-document.getElementById('settingsModal').addEventListener('click', (e) => {
-    if (e.target.id === 'settingsModal') {
-        document.getElementById('settingsModal').classList.remove('show');
+    if (window.soundManager && window.appSettings.sound) {
+        window.soundManager.play('click');
+    }
+    if (window.appSettings.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
 });
 
-// Кнопка закрытия
-const settingsCloseBtn = document.getElementById('settingsCloseBtn');
-if (settingsCloseBtn) {
-    settingsCloseBtn.addEventListener('click', () => {
-        const modal = document.getElementById('settingsModal');
-        if (modal) modal.classList.remove('show');
+// Вибрация
+document.getElementById('vibrationCheckbox')?.addEventListener('change', (e) => {
+    const enabled = !!e.target.checked;
+    saveSetting('vibration', enabled);
 
-        if (window.soundManager) window.soundManager.play('click');
-        if (window.appSettings.vibration && tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('light');
-        }
-    });
-}
+    if (enabled && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+});
+
+// Звук
+document.getElementById('soundCheckbox')?.addEventListener('change', (e) => {
+    const enabled = !!e.target.checked;
+    saveSetting('sound', enabled);
+
+    const volumeRange = document.getElementById('volumeRange');
+    if (volumeRange) volumeRange.disabled = !enabled;
+
+    applyVolumeUI(window.appSettings.volume);
+
+    if (enabled && window.soundManager) {
+        window.soundManager.play('click');
+    }
+});
+
+// Громкость
+document.getElementById('volumeRange')?.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    const vol = Math.max(0, Math.min(100, val)) / 100;
+
+    saveSetting('volume', vol);
+    applyVolumeUI(vol);
+
+    if (window.appSettings.sound && window.soundManager) {
+        window.soundManager.play('click');
+    }
+});
+
+// === 🟢 Кнопка сброса данных ===
+document.getElementById('resetDataBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation(); // Не закрываем модалку сразу
+    if (window.soundManager?.play) window.soundManager.play('error');
+    if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+    }
+
+    resetAllData();
+});
+
+// === Закрытие модалки ===
+document.getElementById('settingsModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'settingsModal') {
+        document.getElementById('settingsModal')?.classList.remove('show');
+    }
+});
+
+document.getElementById('settingsCloseBtn')?.addEventListener('click', () => {
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.remove('show');
+
+    if (window.soundManager?.play) window.soundManager.play('click');
+    if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+});
