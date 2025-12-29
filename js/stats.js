@@ -132,7 +132,7 @@ const loadLeaderboard = async () => {
                 leaderboard = parsed;
                 source = 'Telegram';
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     if (leaderboard.length === 0) {
@@ -143,7 +143,7 @@ const loadLeaderboard = async () => {
                 leaderboard = parsed;
                 source = 'Local';
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     const sorted = leaderboard
@@ -203,7 +203,7 @@ const loadPersonalStats = async () => {
                 stats = parsed;
                 source = 'Telegram';
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     if (!stats) {
@@ -215,7 +215,7 @@ const loadPersonalStats = async () => {
                 stats = { highScore, totalGames, totalScore, lastUpdated: now };
                 source = 'Local';
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     cachedPersonalStats = stats;
@@ -368,8 +368,8 @@ const renderLeaderboard = (leaderboard, container) => {
                 <div class="player-info">
                     <div class="player-name">
                         ${isDeleted
-                            ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
-                            : displayName}
+                ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
+                : displayName}
                         ${!isDeleted && isYou ? ' <span style="color:var(--neon-cyan); font-size:12px;">(You)</span>' : ''}
                     </div>
                     ${isDeleted ? '' : `<div class="player-level">Level ${entry.level}</div>`}
@@ -382,7 +382,7 @@ const renderLeaderboard = (leaderboard, container) => {
     container.innerHTML = html;
 };
 
-// === Рендер личной статистики ===
+// === Рендер личной статистики с кнопкой Sync Now ===
 const renderPersonalStats = async (container) => {
     if (!container) return;
 
@@ -419,6 +419,15 @@ const renderPersonalStats = async (container) => {
         `;
     }
 
+    const syncButtonHtml = `
+        <button id="syncNowBtn"
+                style="display: block; margin: 16px auto 12px; padding: 8px 18px; font: bold 12px 'Orbitron'; color: var(--neon-green);
+                       border: 1px solid var(--neon-green); border-radius: 8px; background: rgba(5, 255, 161, 0.1);
+                       text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 12px rgba(5, 255, 161, 0.2);">
+            🔁 Sync Now
+        </button>
+    `;
+
     container.innerHTML = `
         <div style="display: flex; justify-content: flex-end; margin-bottom: 8px; margin-top: -10px;">
             <span class="data-source-tag">${source}</span>
@@ -448,7 +457,36 @@ const renderPersonalStats = async (container) => {
                 ${guestNotice}
             </div>
         </div>
+        ${syncButtonHtml}
     `;
+
+    // Обработчик кнопки Sync Now
+    document.getElementById('syncNowBtn')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (window.soundManager?.play) window.soundManager.play('click');
+
+        const tg = window.Telegram?.WebApp;
+        if (window.appSettings?.vibration && tg?.HapticFeedback) {
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        const btn = document.getElementById('syncNowBtn');
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.innerHTML = '🔄 Syncing...';
+
+        try {
+            await autoSync();
+        } catch (err) {
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('No connection', 'error');
+            }
+        } finally {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.innerHTML = '🔁 Sync Now';
+        }
+    });
 };
 
 // === UI: Открытие модалки ===
@@ -510,49 +548,40 @@ const autoSync = async () => {
     if (!APP_USER_ID) return;
 
     try {
-        // Попробуем отправить оффлайн-данные из localStorage
         const localLeaderboard = safeParse(localStorage.getItem('snakeLeaderboard'));
-        if (Array.isArray(localLeaderboard) && localLeaderboard.length > 0) {
+        if (Array.isArray(localLeaderboard)) {
             const userScore = localLeaderboard.find(p => p.userId === APP_USER_ID);
             if (userScore) {
-                // Попробуем отправить последний счёт
                 await saveScoreToLeaderboard(userScore.score, userScore.level);
             }
         }
 
-        // Обновим статистику и лидерборд
         cachedPersonalStats = null;
         cachedLeaderboard = null;
 
         if (typeof showSnackbar === 'function') {
-            showSnackbar('🔄 Synced with cloud', 'info');
+            showSnackbar('✅ Synced with server', 'success');
         }
     } catch (e) {
         console.warn('Auto-sync failed', e);
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('No internet', 'error');
+        }
     }
 };
 
-// Telegram WebApp Events
+// Подписка на события
 if (window.Telegram?.WebApp) {
     window.Telegram.WebApp.onEvent('viewport_changed', (vp) => {
-        if (vp.is_state_stable && vp.is_visible) {
-            autoSync();
-        }
+        if (vp.is_state_stable && vp.is_visible) autoSync();
     });
-
     window.Telegram.WebApp.onEvent('focus', autoSync);
 }
 
-// Обычные события браузера
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        setTimeout(autoSync, 500);
-    }
+    if (document.visibilityState === 'visible') setTimeout(autoSync, 500);
 });
-
-window.addEventListener('focus', () => {
-    setTimeout(autoSync, 500);
-});
+window.addEventListener('focus', () => setTimeout(autoSync, 500));
 
 // === Экспорт функций ===
 window.loadPersonalStats = loadPersonalStats;

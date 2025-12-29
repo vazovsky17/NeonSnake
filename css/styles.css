@@ -649,15 +649,18 @@ body::before {
 }
 
 .snackbar.success::after {
-    content: "\f00c"; /* галочка */
+    content: "\f00c";
+    /* галочка */
 }
 
 .snackbar.info::after {
-    content: "\f05a"; /* i в круге */
+    content: "\f05a";
+    /* i в круге */
 }
 
 .snackbar.error::after {
-    content: "\f00d"; /* крестик */
+    content: "\f00d";
+    /* крестик */
 }
 
 /* Типы уведомлений */
@@ -702,9 +705,48 @@ body::before {
         transform: translateX(-50%) translateY(20px);
         opacity: 0;
     }
+
     to {
         transform: translateX(-50%);
         opacity: 1;
     }
 }
 
+.data-source-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    color: #ccc;
+    border: 1px solid #444;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    opacity: 0.8;
+}
+
+.data-source-tag::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--tag-color, #ccc);
+}
+
+.data-source-tag[style*="API"] {
+    --tag-color: #00ff88;
+}
+
+.data-source-tag[style*="Telegram"] {
+    --tag-color: #00aaff;
+}
+
+.data-source-tag[style*="Local"] {
+    --tag-color: #ff9900;
+}
+
+.data-source-tag[style*="Cache"] {
+    --tag-color: #aaaaaa;
+}
