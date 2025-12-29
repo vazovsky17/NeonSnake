@@ -93,7 +93,33 @@ const updateUI = () => {
     document.getElementById('score').textContent = score;
     document.getElementById('level').textContent = level;
     document.getElementById('speed').textContent = `${level}x`;
-    document.getElementById('highScore').textContent = highScore;
+
+    const highScoreEl = document.getElementById('highScore');
+
+    // 🔥 Новый рекорд — обновляем в реальном времени
+    if (score > highScore) {
+        highScore = score;
+        highScoreEl.textContent = highScore;
+
+        // ✨ Визуальный эффект
+        highScoreEl.style.color = 'var(--neon-yellow)';
+        highScoreEl.style.textShadow = '0 0 10px rgba(255, 255, 0, 0.8)';
+
+        setTimeout(() => {
+            highScoreEl.style.color = '';
+            highScoreEl.style.textShadow = '';
+        }, 800);
+
+        // 🔊 Звук нового рекорда
+        if (window.soundManager) {
+            window.soundManager.play('newrecord');
+        }
+
+        // 📱 Вибрация (если включена)
+        if (window.appSettings?.vibration && window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+    }
 
     const currentLevelScore = getRequiredScoreForLevel(level);
     const nextLevelScore = getRequiredScoreForLevel(level + 1);
@@ -101,7 +127,7 @@ const updateUI = () => {
     const scoreNeeded = nextLevelScore - currentLevelScore;
     const progress = Math.min(100, (scoreInLevel / scoreNeeded) * 100);
 
-    document.getElementById('levelProgressText').textContent = `${scoreInLevel}/${scoreNeeded}`;
+    document.getElementById('levelProgressText').textContent = `${scoreInLine}/${scoreNeeded}`;
     document.getElementById('progressBar').style.width = `${progress}%`;
 };
 
@@ -412,71 +438,71 @@ const quitGame = () => {
 
 // === Share result ===
 const shareScore = () => {
-  const isRecord = score >= highScore;
-  
-  // Формируем сообщение
-  let message = `🎮 I just played Neon Snake!\n\n`;
-  message += `🎯 Score: ${score.toLocaleString()}\n`;
-  message += `⚡ Level: ${level}\n`;
-  
-  if (isRecord) {
-    message += `\n🏆 NEW PERSONAL RECORD! 🎉\n`;
-  }
-  
-  message += `\nCan you beat me? Try it now!`;
+    const isRecord = score >= highScore;
 
-  try {
-    // 1. Попытка использовать Telegram WebApp share (внутри Telegram)
-    if (tg?.share) {
-      tg.share(message);
-    } 
-    // 2. Fallback: открыть диалог шаринга через t.me ссылку
-    else {
-      const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
-      const encodedMessage = encodeURIComponent(message + '\n\n' + gameUrl);
-      const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(gameUrl)}&text=${encodedMessage}`;
-      
-      // Открываем в новом окне
-      window.open(telegramShareUrl, '_blank');
-      
-      if (typeof showSnackbar === 'function') {
-        showSnackbar("Opening Telegram share...", "info");
-      }
+    // Формируем сообщение
+    let message = `🎮 I just played Neon Snake!\n\n`;
+    message += `🎯 Score: ${score.toLocaleString()}\n`;
+    message += `⚡ Level: ${level}\n`;
+
+    if (isRecord) {
+        message += `\n🏆 NEW PERSONAL RECORD! 🎉\n`;
     }
-  } catch (e) {
-    console.error('Share failed', e);
-    
-    // Последний fallback: копируем в буфер
-    const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
-    const fullMessage = message + '\n\n' + gameUrl;
-    
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(fullMessage)
-        .then(() => {
-          if (typeof showSnackbar === 'function') {
-            showSnackbar("Message copied! Share it in Telegram", "info");
-          }
-        })
-        .catch(() => {
-          if (typeof showSnackbar === 'function') {
-            showSnackbar("Share failed", "error");
-          }
-        });
+
+    message += `\nCan you beat me? Try it now!`;
+
+    try {
+        // 1. Попытка использовать Telegram WebApp share (внутри Telegram)
+        if (tg?.share) {
+            tg.share(message);
+        }
+        // 2. Fallback: открыть диалог шаринга через t.me ссылку
+        else {
+            const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+            const encodedMessage = encodeURIComponent(message + '\n\n' + gameUrl);
+            const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(gameUrl)}&text=${encodedMessage}`;
+
+            // Открываем в новом окне
+            window.open(telegramShareUrl, '_blank');
+
+            if (typeof showSnackbar === 'function') {
+                showSnackbar("Opening Telegram share...", "info");
+            }
+        }
+    } catch (e) {
+        console.error('Share failed', e);
+
+        // Последний fallback: копируем в буфер
+        const gameUrl = 'https://t.me/vazovskyapps_bot/neonsnake';
+        const fullMessage = message + '\n\n' + gameUrl;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(fullMessage)
+                .then(() => {
+                    if (typeof showSnackbar === 'function') {
+                        showSnackbar("Message copied! Share it in Telegram", "info");
+                    }
+                })
+                .catch(() => {
+                    if (typeof showSnackbar === 'function') {
+                        showSnackbar("Share failed", "error");
+                    }
+                });
+        }
     }
-  }
 
-  // Haptic & sound feedback
-  if (window.appSettings?.vibration && tg?.HapticFeedback) {
-    tg.HapticFeedback.impactOccurred('medium');
-  }
+    // Haptic & sound feedback
+    if (window.appSettings?.vibration && tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+    }
 
-  if (window.soundManager) {
-    window.soundManager.play('click');
-  }
+    if (window.soundManager) {
+        window.soundManager.play('click');
+    }
 };
 
 document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
-  shareScore();
+    shareScore();
 });
 
 document.getElementById('shareScoreBtn')?.addEventListener('click', () => {
