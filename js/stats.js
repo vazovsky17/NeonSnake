@@ -124,7 +124,6 @@ const loadLeaderboard = async () => {
         console.warn('API leaderboard failed', e);
     }
 
-    // Fallback: CloudStorage
     if (leaderboard.length === 0) {
         try {
             const data = await loadFromCloudWithTimeout('leaderboard');
@@ -133,10 +132,9 @@ const loadLeaderboard = async () => {
                 leaderboard = parsed;
                 source = 'Telegram';
             }
-        } catch (e) { }
+        } catch (e) {}
     }
 
-    // Fallback: localStorage
     if (leaderboard.length === 0) {
         try {
             const saved = localStorage.getItem('snakeLeaderboard');
@@ -145,18 +143,15 @@ const loadLeaderboard = async () => {
                 leaderboard = parsed;
                 source = 'Local';
             }
-        } catch (e) { }
+        } catch (e) {}
     }
 
-    // Сортируем по убыванию и ограничиваем до 100
     const sorted = leaderboard
         .sort((a, b) => b.score - a.score)
         .slice(0, 100);
 
     cachedLeaderboard = sorted;
     cachedLeaderboardTimestamp = now;
-
-    // Добавляем метку источника
     sorted._source = source;
     return sorted;
 };
@@ -200,7 +195,6 @@ const loadPersonalStats = async () => {
         console.warn('API /score failed', e);
     }
 
-    // Fallback: Cloud
     if (!stats) {
         try {
             const cloud = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
@@ -209,10 +203,9 @@ const loadPersonalStats = async () => {
                 stats = parsed;
                 source = 'Telegram';
             }
-        } catch (e) { }
+        } catch (e) {}
     }
 
-    // Fallback: localStorage
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
@@ -222,13 +215,11 @@ const loadPersonalStats = async () => {
                 stats = { highScore, totalGames, totalScore, lastUpdated: now };
                 source = 'Local';
             }
-        } catch (e) { }
+        } catch (e) {}
     }
 
     cachedPersonalStats = stats;
     cachedPersonalStatsTimestamp = now;
-
-    // Добавляем источник
     if (stats) stats._source = source;
     return stats;
 };
@@ -260,7 +251,6 @@ const saveScoreToLeaderboard = async (score, level) => {
         });
 
         if (res.ok) {
-            // Успешно, сбросим кэш
             cachedPersonalStats = null;
             cachedLeaderboard = null;
             lastSaveTime = now;
@@ -286,7 +276,6 @@ const saveScoreToLeaderboard = async (score, level) => {
         await fallbackSaveToStorage(userData);
     }
 
-    // Обновляем UI, если модалка открыта и активна
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
@@ -318,19 +307,16 @@ const fallbackSaveToStorage = async (userData) => {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 100);
 
-            // Сохраняем и в облако, и в localStorage
             if (typeof window.saveToCloud === 'function') {
                 window.saveToCloud('leaderboard', JSON.stringify(final));
             }
             safeSetItem('snakeLeaderboard', JSON.stringify(final));
 
-            // Обновляем кэш
             cachedLeaderboard = final;
             cachedLeaderboardTimestamp = Date.now();
         }
     } catch (e) {
         try {
-            // Резервное сохранение в localStorage
             const local = safeParse(localStorage.getItem('snakeLeaderboard')) || [];
             const filtered = local.filter(p => p.userId !== userData.userId);
             filtered.push(userData);
@@ -382,8 +368,8 @@ const renderLeaderboard = (leaderboard, container) => {
                 <div class="player-info">
                     <div class="player-name">
                         ${isDeleted
-                ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
-                : displayName}
+                            ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
+                            : displayName}
                         ${!isDeleted && isYou ? ' <span style="color:var(--neon-cyan); font-size:12px;">(You)</span>' : ''}
                     </div>
                     ${isDeleted ? '' : `<div class="player-level">Level ${entry.level}</div>`}
@@ -519,8 +505,57 @@ document.getElementById('statsModal')?.addEventListener('click', (e) => {
     }
 });
 
-// === Экспорт функций для внешнего использования ===
+// === Авто-синхронизация при возврате в приложение ===
+const autoSync = async () => {
+    if (!APP_USER_ID) return;
+
+    try {
+        // Попробуем отправить оффлайн-данные из localStorage
+        const localLeaderboard = safeParse(localStorage.getItem('snakeLeaderboard'));
+        if (Array.isArray(localLeaderboard) && localLeaderboard.length > 0) {
+            const userScore = localLeaderboard.find(p => p.userId === APP_USER_ID);
+            if (userScore) {
+                // Попробуем отправить последний счёт
+                await saveScoreToLeaderboard(userScore.score, userScore.level);
+            }
+        }
+
+        // Обновим статистику и лидерборд
+        cachedPersonalStats = null;
+        cachedLeaderboard = null;
+
+        if (typeof showSnackbar === 'function') {
+            showSnackbar('🔄 Synced with cloud', 'info');
+        }
+    } catch (e) {
+        console.warn('Auto-sync failed', e);
+    }
+};
+
+// Telegram WebApp Events
+if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.onEvent('viewport_changed', (vp) => {
+        if (vp.is_state_stable && vp.is_visible) {
+            autoSync();
+        }
+    });
+
+    window.Telegram.WebApp.onEvent('focus', autoSync);
+}
+
+// Обычные события браузера
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        setTimeout(autoSync, 500);
+    }
+});
+
+window.addEventListener('focus', () => {
+    setTimeout(autoSync, 500);
+});
+
+// === Экспорт функций ===
 window.loadPersonalStats = loadPersonalStats;
-window.savePersonalStats = savePersonalStats; // может быть не реализована, если не используется
+window.savePersonalStats = savePersonalStats;
 window.saveScoreToLeaderboard = saveScoreToLeaderboard;
 window.loadLeaderboard = loadLeaderboard;
