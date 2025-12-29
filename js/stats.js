@@ -102,20 +102,28 @@ const loadLeaderboard = async () => {
 
     let leaderboard = [];
 
-    // 1. API
     try {
-        const res = await fetch(`${API_URL}/api/leaderboard`);
+        const res = await fetch(`${API_URL}/api/leaderboard`, {
+            method: 'GET',
+            cache: 'no-cache'  // ← всегда свежий запрос
+        });
+
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
                 leaderboard = data;
                 if (typeof showSnackbar === 'function') {
-                    showSnackbar(leaderboard.length ? `Top ${leaderboard.length}` : 'No scores yet', 'info');
+                    if (leaderboard.length === 0) {
+                        showSnackbar('No scores yet', 'info');
+                    } else if (lastLeaderboardLength !== leaderboard.length) {
+                        showSnackbar(`Top ${leaderboard.length} players loaded`, 'success');
+                    }
                 }
+                lastLeaderboardLength = leaderboard.length;
             }
         }
     } catch (e) {
-        console.warn('API leaderboard failed', e);
+        console.warn('API failed', e);
     }
 
     // 2. CloudStorage fallback
@@ -157,9 +165,16 @@ const loadPersonalStats = async () => {
 
     let stats = null;
 
-    // 1. API
+    // 1. Загрузка с API (без кэширования)
     try {
-        const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`);
+        const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`, {
+            method: 'GET',
+            cache: 'no-cache',  // ← Ключевое: не использовать 304 из кэша
+            headers: {
+                'Cache-Control': 'no-cache'  // ← Дополнительная страховка
+            }
+        });
+
         if (res.ok) {
             const data = await res.json();
             if (data.score !== undefined) {
@@ -171,15 +186,17 @@ const loadPersonalStats = async () => {
                     level: data.level || 1
                 };
                 if (typeof showSnackbar === 'function') {
-                    showSnackbar('Stats loaded', 'success');
+                    showSnackbar('Stats loaded from server', 'success');
                 }
             }
+        } else {
+            console.warn('API /score returned', res.status);
         }
     } catch (e) {
-        console.warn('API personal stats failed', e);
+        console.warn('API /score failed', e);
     }
 
-    // 2. CloudStorage
+    // 2. Fallback: CloudStorage → localStorage
     if (!stats) {
         try {
             const data = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
@@ -188,19 +205,13 @@ const loadPersonalStats = async () => {
         } catch (e) { }
     }
 
-    // 3. localStorage
     if (!stats) {
         try {
             const highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
             const totalGames = parseInt(localStorage.getItem('totalGames')) || 0;
             const totalScore = parseInt(localStorage.getItem('totalScore')) || 0;
             if (highScore || totalGames || totalScore) {
-                stats = {
-                    highScore,
-                    totalGames,
-                    totalScore,
-                    lastUpdated: now
-                };
+                stats = { highScore, totalGames, totalScore, lastUpdated: now };
             }
         } catch (e) { }
     }
@@ -224,7 +235,7 @@ const saveScoreToLeaderboard = async (score, level) => {
     }
 
     const timestamp = now;
-    const hash = createHash(APP_USER_ID, score, level, timestamp); // ← Ключевое: совпадает с сервером
+    const hash = createHash(APP_USER_ID, score, level, timestamp);
 
     const userData = {
         userId: APP_USER_ID,
@@ -238,26 +249,50 @@ const saveScoreToLeaderboard = async (score, level) => {
     try {
         const res = await fetch(`${API_URL}/api/score`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userData)
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+            },
+            body: JSON.stringify(userData),
+            cache: 'no-cache'  // ← не кэшировать
         });
 
         if (res.ok) {
-            cachedLeaderboard = null;
+            cachedPersonalStats = null;  // ← Обновим при следующем чтении
+            cachedLeaderboard = null;    // ← Обновим лидерборд
             lastSaveTime = now;
+
             if (typeof showSnackbar === 'function') {
                 showSnackbar(`✅ Score saved: ${score}`, 'success');
             }
         } else {
-            const err = await res.json().catch(() => ({}));
-            console.warn('Save failed:', err?.error || res.status);
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Saving offline...', 'info');
+            const errorData = await res.json().catch(() => ({}));
+            const errorMsg = errorData.error || res.statusText;
+
+            if (res.status === 429) {
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Too fast! Wait...', 'warning');
+                }
+            } else if (res.status === 400) {
+                if (errorMsg.includes('hash') || errorMsg.includes('signature')) {
+                    if (typeof showSnackbar === 'function') {
+                        showSnackbar('Cheating detected', 'error');
+                    }
+                } else {
+                    if (typeof showSnackbar === 'function') {
+                        showSnackbar('Invalid data', 'error');
+                    }
+                }
+            } else {
+                // Ошибка сети или сервера → fallback
+                if (typeof showSnackbar === 'function') {
+                    showSnackbar('Saving offline...', 'info');
+                }
+                await fallbackSaveToStorage(userData);
             }
-            await fallbackSaveToStorage(userData);
         }
     } catch (e) {
-        console.warn('Network error, saving locally', e);
+        console.warn('Network error, saving offline', e);
         if (typeof showSnackbar === 'function') {
             showSnackbar('Offline saved', 'info');
         }
