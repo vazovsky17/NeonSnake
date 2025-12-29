@@ -438,7 +438,11 @@ const renderPersonalStats = async (container) => {
 // === UI: Открытие модалки ===
 document.getElementById('statsBtn')?.addEventListener('click', async () => {
     if (window.soundManager?.play) window.soundManager.play('click');
-    if (window.isGameRunning && !window.isPaused && window.togglePause) window.togglePause();
+    
+    // Поставить на паузу
+    if (isGameRunning && !isPaused) {
+        togglePause();
+    }
 
     const modal = document.getElementById('statsModal');
     if (!modal) return;
