@@ -11,13 +11,10 @@ const safeBtoa = (str) => {
     }
 };
 
-// 🔁 Синхронизированная функция base64, максимально близкая к Node.js Buffer
 const createHash = (userId, score, level, timestamp) => {
     const input = `${userId}:${score}:${level}:${timestamp}`;
-    // Используем TextEncoder для совместимости
     const encoder = new TextEncoder();
     const bytes = encoder.encode(input);
-    // Конвертим в base64 вручную, как в Node.js
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
         binary += String.fromCharCode(bytes[i]);
@@ -61,13 +58,12 @@ const loadFromCloudWithTimeout = (key) => {
     });
 };
 
-// === Инициализация Telegram ===
+// === Telegram User ===
 const getTelegramUser = () => {
     const tg = window.Telegram?.WebApp;
     return tg?.initDataUnsafe?.user || null;
 };
 
-// === Глобальные переменные ===
 const tgUser = getTelegramUser();
 const APP_USER_ID = tgUser ? String(tgUser.id) : null;
 const APP_USERNAME = tgUser
@@ -91,7 +87,7 @@ const API_URL = 'https://neon-snake-leaderboard.vercel.app';
 
 // === Анти-спам ===
 let lastSaveTime = 0;
-const MIN_SAVE_INTERVAL = 10000; // Должно быть >= MIN_INTERVAL на сервере (10 сек)
+const MIN_SAVE_INTERVAL = 10000; // Должно совпадать с сервером
 
 // === Загрузка лидерборда: API → Cloud → LocalStorage ===
 const loadLeaderboard = async () => {
@@ -105,7 +101,7 @@ const loadLeaderboard = async () => {
     try {
         const res = await fetch(`${API_URL}/api/leaderboard`, {
             method: 'GET',
-            cache: 'no-cache'  // ← всегда свежий запрос
+            cache: 'no-cache'
         });
 
         if (res.ok) {
@@ -115,18 +111,17 @@ const loadLeaderboard = async () => {
                 if (typeof showSnackbar === 'function') {
                     if (leaderboard.length === 0) {
                         showSnackbar('No scores yet', 'info');
-                    } else if (lastLeaderboardLength !== leaderboard.length) {
+                    } else {
                         showSnackbar(`Top ${leaderboard.length} players loaded`, 'success');
                     }
                 }
-                lastLeaderboardLength = leaderboard.length;
             }
         }
     } catch (e) {
-        console.warn('API failed', e);
+        console.warn('API leaderboard failed', e);
     }
 
-    // 2. CloudStorage fallback
+    // Fallback: CloudStorage
     if (leaderboard.length === 0) {
         try {
             const data = await loadFromCloudWithTimeout('leaderboard');
@@ -135,7 +130,7 @@ const loadLeaderboard = async () => {
         } catch (e) { }
     }
 
-    // 3. localStorage fallback
+    // Fallback: localStorage
     if (leaderboard.length === 0) {
         try {
             const saved = localStorage.getItem('snakeLeaderboard');
@@ -144,7 +139,7 @@ const loadLeaderboard = async () => {
         } catch (e) { }
     }
 
-    // Сортировка и кэширование
+    // Сортируем по убыванию счёта и кэшируем
     const sorted = leaderboard
         .sort((a, b) => b.score - a.score)
         .slice(0, 100);
@@ -165,42 +160,36 @@ const loadPersonalStats = async () => {
 
     let stats = null;
 
-    // 1. Загрузка с API (без кэширования)
     try {
         const res = await fetch(`${API_URL}/api/score?userId=${APP_USER_ID}`, {
             method: 'GET',
-            cache: 'no-cache',  // ← Ключевое: не использовать 304 из кэша
-            headers: {
-                'Cache-Control': 'no-cache'  // ← Дополнительная страховка
-            }
+            cache: 'no-cache',
+            headers: { 'Cache-Control': 'no-cache' }
         });
 
         if (res.ok) {
             const data = await res.json();
-            if (data.score !== undefined) {
-                stats = {
-                    highScore: data.score || 0,
-                    totalGames: data.totalGames || 0,
-                    totalScore: data.totalScore || 0,
-                    lastUpdated: data.timestamp || now,
-                    level: data.level || 1
-                };
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Stats loaded from server', 'success');
-                }
+            stats = {
+                highScore: data.score || 0,
+                level: data.level || 1,
+                totalGames: data.totalGames || 0,
+                totalScore: data.totalScore || 0,
+                lastUpdated: data.timestamp || now,
+                deleted: !!data.deletedAt
+            };
+            if (typeof showSnackbar === 'function') {
+                showSnackbar('Stats loaded from server', 'success');
             }
-        } else {
-            console.warn('API /score returned', res.status);
         }
     } catch (e) {
         console.warn('API /score failed', e);
     }
 
-    // 2. Fallback: CloudStorage → localStorage
+    // Fallback: Cloud или localStorage
     if (!stats) {
         try {
-            const data = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
-            const parsed = safeParse(data);
+            const cloud = await loadFromCloudWithTimeout(`user_stats_${APP_USER_ID}`);
+            const parsed = safeParse(cloud);
             if (parsed && parsed.highScore !== undefined) stats = parsed;
         } catch (e) { }
     }
@@ -221,7 +210,7 @@ const loadPersonalStats = async () => {
     return stats;
 };
 
-// === Сохранение результата ===
+// === Сохранение результата в лидерборд ===
 const saveScoreToLeaderboard = async (score, level) => {
     if (!APP_USER_ID || !APP_USERNAME) {
         if (typeof showSnackbar === 'function') showSnackbar('Guest can\'t save', 'info');
@@ -237,69 +226,41 @@ const saveScoreToLeaderboard = async (score, level) => {
     const timestamp = now;
     const hash = createHash(APP_USER_ID, score, level, timestamp);
 
-    const userData = {
-        userId: APP_USER_ID,
-        name: APP_USERNAME,
-        score,
-        level,
-        timestamp,
-        hash
-    };
+    const userData = { userId: APP_USER_ID, name: APP_USERNAME, score, level, timestamp, hash };
 
     try {
         const res = await fetch(`${API_URL}/api/score`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
             body: JSON.stringify(userData),
-            cache: 'no-cache'  // ← не кэшировать
+            cache: 'no-cache'
         });
 
         if (res.ok) {
-            cachedPersonalStats = null;  // ← Обновим при следующем чтении
-            cachedLeaderboard = null;    // ← Обновим лидерборд
+            cachedPersonalStats = null;
+            cachedLeaderboard = null;
             lastSaveTime = now;
-
-            if (typeof showSnackbar === 'function') {
-                showSnackbar(`✅ Score saved: ${score}`, 'success');
-            }
+            if (typeof showSnackbar === 'function') showSnackbar(`✅ Score saved: ${score}`, 'success');
         } else {
             const errorData = await res.json().catch(() => ({}));
             const errorMsg = errorData.error || res.statusText;
 
             if (res.status === 429) {
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Too fast! Wait...', 'warning');
-                }
-            } else if (res.status === 400) {
-                if (errorMsg.includes('hash') || errorMsg.includes('signature')) {
-                    if (typeof showSnackbar === 'function') {
-                        showSnackbar('Cheating detected', 'error');
-                    }
-                } else {
-                    if (typeof showSnackbar === 'function') {
-                        showSnackbar('Invalid data', 'error');
-                    }
-                }
+                if (typeof showSnackbar === 'function') showSnackbar('Too fast! Wait...', 'warning');
+            } else if (res.status === 400 && (errorMsg.includes('hash') || errorMsg.includes('signature'))) {
+                if (typeof showSnackbar === 'function') showSnackbar('Cheating detected', 'error');
             } else {
-                // Ошибка сети или сервера → fallback
-                if (typeof showSnackbar === 'function') {
-                    showSnackbar('Saving offline...', 'info');
-                }
+                if (typeof showSnackbar === 'function') showSnackbar('Saving offline...', 'info');
                 await fallbackSaveToStorage(userData);
             }
         }
     } catch (e) {
         console.warn('Network error, saving offline', e);
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Offline saved', 'info');
-        }
+        if (typeof showSnackbar === 'function') showSnackbar('Offline saved', 'info');
         await fallbackSaveToStorage(userData);
     }
 
-    // Обновление UI
+    // Обновляем UI, если модалка открыта и активна
     const modal = document.getElementById('statsModal');
     const activeTab = document.querySelector('.stats-tab.active');
     if (modal?.classList.contains('show') && activeTab?.dataset.tab === 'global') {
@@ -338,10 +299,6 @@ const fallbackSaveToStorage = async (userData) => {
 
             cachedLeaderboard = final;
             cachedLeaderboardTimestamp = Date.now();
-
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Saved offline', 'info');
-            }
         }
     } catch (e) {
         try {
@@ -352,40 +309,12 @@ const fallbackSaveToStorage = async (userData) => {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 100);
             safeSetItem('snakeLeaderboard', JSON.stringify(saved));
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Saved locally', 'info');
-            }
         } catch (e2) {
-            if (typeof showSnackbar === 'function') {
-                showSnackbar('Save failed', 'error');
-            }
+            if (typeof showSnackbar === 'function') showSnackbar('Save failed', 'error');
         }
     }
 };
 
-// === Сохранение личной статистики ===
-const savePersonalStats = async (stats) => {
-    if (!APP_USER_ID || !stats) return;
-
-    try {
-        if (typeof window.saveToCloud === 'function') {
-            window.saveToCloud(`user_stats_${APP_USER_ID}`, JSON.stringify(stats));
-        }
-        safeSetItem('snakeHighScore', stats.highScore);
-        safeSetItem('totalGames', stats.totalGames);
-        safeSetItem('totalScore', stats.totalScore);
-        cachedPersonalStats = { ...stats };
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Stats saved', 'success');
-        }
-    } catch (e) {
-        if (typeof showSnackbar === 'function') {
-            showSnackbar('Failed to save', 'error');
-        }
-    }
-};
-
-// === Рендер лидерборда ===
 // === Рендер лидерборда ===
 const renderLeaderboard = (leaderboard, container) => {
     if (!container) return;
@@ -404,21 +333,24 @@ const renderLeaderboard = (leaderboard, container) => {
     leaderboard.slice(0, 50).forEach((entry, index) => {
         const rank = index + 1;
         const isYou = entry.userId === APP_USER_ID;
-
-        // Проверяем, удалён ли пользователь
-        const isDeleted = entry.deletedAt || (entry.score === 0 && entry.timestamp < Date.now() - 60000);
-        const displayName = isDeleted ? '[deleted]' : entry.name;
+        const isDeleted = !!entry.deletedAt;
 
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+        const displayName = isDeleted ? '[deleted]' : entry.name;
 
         html += `
             <div class="leaderboard-item ${isYou ? 'current-user' : ''} ${isDeleted ? 'deleted' : ''}">
                 <div class="rank" style="color:${rank <= 3 ? 'var(--neon-yellow)' : ''}">${medal}</div>
                 <div class="player-info">
-                    <div class="player-name">${isDeleted ? '<span style="opacity: 0.5; font-style: italic;">[deleted]</span>' : displayName}${isYou && !isDeleted ? ' (You)' : ''}</div>
+                    <div class="player-name">
+                        ${isDeleted
+                ? '<span style="opacity: 0.6; font-style: italic;">[deleted]</span>'
+                : displayName}
+                        ${!isDeleted && isYou ? ' <span style="color:var(--neon-cyan); font-size:12px;">(You)</span>' : ''}
+                    </div>
                     ${isDeleted ? '' : `<div class="player-level">Level ${entry.level}</div>`}
                 </div>
-                <div class="player-score">${isDeleted ? '-' : entry.score.toLocaleString()}</div>
+                <div class="player-score">${isDeleted ? '–' : entry.score.toLocaleString()}</div>
             </div>
         `;
     });
@@ -435,6 +367,7 @@ const renderPersonalStats = async (container) => {
     const totalGames = stats?.totalGames || 0;
     const totalScore = stats?.totalScore || 0;
     const avgScore = totalGames > 0 ? Math.round(totalScore / totalGames) : 0;
+    const isDeleted = stats?.deleted;
 
     let guestNotice = '';
     if (!getTelegramUser()) {
@@ -463,14 +396,26 @@ const renderPersonalStats = async (container) => {
     container.innerHTML = `
         <div class="stats-info">
             <div class="stats-grid">
-                <div class="stat-item"><div class="stat-item-label">Best Score</div><div class="stat-item-value">${highScore.toLocaleString()}</div></div>
-                <div class="stat-item"><div class="stat-item-label">Total Games</div><div class="stat-item-value">${totalGames}</div></div>
-                <div class="stat-item"><div class="stat-item-label">Total Score</div><div class="stat-item-value">${totalScore.toLocaleString()}</div></div>
-                <div class="stat-item"><div class="stat-item-label">Avg Score</div><div class="stat-item-value">${avgScore.toLocaleString()}</div></div>
+                <div class="stat-item">
+                    <div class="stat-item-label">Best Score</div>
+                    <div class="stat-item-value">${isDeleted ? '–' : highScore.toLocaleString()}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-item-label">Total Games</div>
+                    <div class="stat-item-value">${totalGames}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-item-label">Total Score</div>
+                    <div class="stat-item-value">${totalScore.toLocaleString()}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-item-label">Avg Score</div>
+                    <div class="stat-item-value">${avgScore.toLocaleString()}</div>
+                </div>
             </div>
             <div style="text-align: center; padding: 20px; color: var(--neon-purple); font-size: 14px;">
-                <p style="margin-bottom: 5px;">👤 ${APP_USERNAME}</p>
-                <p style="opacity: 0.7;">Keep playing to climb the ranks!</p>
+                <p style="margin-bottom: 5px;">👤 ${isDeleted ? '<span style="opacity:0.6; font-style:italic;">[account deleted]</span>' : APP_USERNAME}</p>
+                <p style="opacity: 0.7;">${isDeleted ? 'Your data is reset' : 'Keep playing to climb the ranks!'}</p>
                 ${guestNotice}
             </div>
         </div>
@@ -531,7 +476,7 @@ document.getElementById('statsModal')?.addEventListener('click', (e) => {
     }
 });
 
-// === Экспорт ===
+// === Экспорт функций ===
 window.loadPersonalStats = loadPersonalStats;
 window.savePersonalStats = savePersonalStats;
 window.saveScoreToLeaderboard = saveScoreToLeaderboard;
