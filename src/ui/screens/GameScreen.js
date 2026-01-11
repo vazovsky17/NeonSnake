@@ -110,8 +110,8 @@ export default class GameScreen {
         this.uiContainer.id = 'game-ui';
         this.uiContainer.style.top = '10px';
         this.uiContainer.style.width = '100%';
-        this.uiContainer.style.maxWidth = 'none'; // 🔥 Убираем ограничение
-        this.uiContainer.style.padding = '0'; // отступы по бокам — 5%
+        this.uiContainer.style.maxWidth = 'none'; 
+        this.uiContainer.style.padding = '0'; 
         this.uiContainer.style.boxSizing = 'border-box';
         this.uiContainer.style.zIndex = '20';
         this.uiContainer.style.fontFamily = 'Orbitron, monospace';
@@ -122,8 +122,8 @@ export default class GameScreen {
             el.style.display = 'flex';
             el.style.justifyContent = 'center';
             el.style.alignItems = 'center';
-            el.style.flex = '1';               // 🔥 Растягиваются равномерно
-            el.style.padding = '12px 10px';    // уменьшили боковые отступы
+            el.style.flex = '1';               
+            el.style.padding = '12px 10px';    
             el.style.border = '1px solid rgba(0, 255, 255, 0.3)';
             el.style.borderRadius = '8px';
             el.style.color = 'var(--neon-cyan)';
@@ -134,6 +134,36 @@ export default class GameScreen {
             el.style.textAlign = 'center';
             el.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.1)';
             el.style.minWidth = '0';           // важно при flex
+        };
+
+        // Применяет стиль похожий на карточки к кнопкам (иконки в 44×44)
+        const applyButtonStyle = (btn, opts = {}) => {
+            cardStyle(btn);
+            btn.style.flex = '0';
+            btn.style.flexShrink = '0';
+            btn.style.padding = opts.padding || '8px';
+            btn.style.boxSizing = 'border-box';
+            btn.style.minWidth = opts.minWidth || '44px';
+            btn.style.height = opts.height || '44px';
+            btn.style.width = opts.width || '44px';
+            btn.style.fontSize = opts.fontSize || '20px';
+            btn.style.fontWeight = 'bold';
+            btn.style.backgroundColor = opts.bg || 'rgba(0, 20, 20, 0.5)';
+            btn.style.color = opts.color || 'var(--neon-purple)';
+            btn.style.cursor = 'pointer';
+            btn.style.transition = 'all 0.18s ease';
+            btn.style.boxShadow = opts.boxShadow || '0 0 8px rgba(0, 255, 255, 0.1)';
+
+            btn.onmouseenter = () => {
+                btn.style.backgroundColor = opts.hoverBg || 'rgba(185, 103, 255, 0.3)';
+                btn.style.transform = 'scale(1.05)';
+                btn.style.boxShadow = opts.hoverBox || '0 0 12px rgba(185, 103, 255, 0.3)';
+            };
+            btn.onmouseleave = () => {
+                btn.style.backgroundColor = opts.bg || 'rgba(185, 103, 255, 0.1)';
+                btn.style.transform = 'scale(1)';
+                btn.style.boxShadow = opts.boxShadow || '0 0 8px rgba(185, 103, 255, 0.1)';
+            };
         };
 
         // 1. Контейнер для заголовка и кнопки настроек
@@ -179,37 +209,7 @@ export default class GameScreen {
 
         const statsButton = document.createElement('button');
         statsButton.innerHTML = '📊'; // или '📈' — на выбор
-        statsButton.style.display = 'flex';
-        statsButton.style.alignItems = 'center';
-        statsButton.style.justifyContent = 'center';
-        statsButton.style.padding = '12px 14px';
-        statsButton.style.border = '1px solid rgba(0, 255, 255, 0.3)';
-        statsButton.style.borderRadius = '8px';
-        statsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.1)';
-        statsButton.style.color = 'var(--neon-purple)';
-        statsButton.style.cursor = 'pointer';
-        statsButton.style.fontSize = '20px';
-        statsButton.style.fontWeight = 'bold';
-        statsButton.style.backdropFilter = 'blur(4px)';
-        statsButton.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.1)';
-        statsButton.style.transition = 'all 0.2s ease';
-        statsButton.style.flexShrink = '0';
-        statsButton.style.boxSizing = 'border-box';
-        statsButton.style.minWidth = '0';
-        statsButton.style.height = '44px';
-        statsButton.style.width = '44px';
-
-        // Ховер-эффект
-        statsButton.onmouseenter = () => {
-            statsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.3)';
-            statsButton.style.transform = 'scale(1.05)';
-            statsButton.style.boxShadow = '0 0 12px rgba(185, 103, 255, 0.3)';
-        };
-        statsButton.onmouseleave = () => {
-            statsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.1)';
-            statsButton.style.transform = 'scale(1)';
-            statsButton.style.boxShadow = '0 0 8px rgba(185, 103, 255, 0.1)';
-        };
+        applyButtonStyle(statsButton, { fontSize: '20px' });
 
         // Клик — переход на экран статистики
         statsButton.onclick = (e) => {
@@ -220,47 +220,31 @@ export default class GameScreen {
         // Кнопка настроек 
         const settingsButton = document.createElement('button');
         settingsButton.innerHTML = '⚙️';
-        settingsButton.style.display = 'flex';
-        settingsButton.style.alignItems = 'center';
-        settingsButton.style.justifyContent = 'center';
-        settingsButton.style.padding = '12px 14px';
-        settingsButton.style.border = '1px solid rgba(0, 255, 255, 0.3)';
-        settingsButton.style.borderRadius = '8px';
-        settingsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.1)';
-        settingsButton.style.color = 'var(--neon-purple)';
-        settingsButton.style.cursor = 'pointer';
-        settingsButton.style.fontSize = '20px';
-        settingsButton.style.fontWeight = 'bold';
-        settingsButton.style.backdropFilter = 'blur(4px)';
-        settingsButton.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.1)';
-        settingsButton.style.transition = 'all 0.2s ease';
-        settingsButton.style.flexShrink = '0';
-        settingsButton.style.boxSizing = 'border-box';
-        settingsButton.style.minWidth = '0';
-        settingsButton.style.height = '44px';
-        settingsButton.style.width = '44px';
-
-        // Ховер-эффект
-        settingsButton.onmouseenter = () => {
-            settingsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.3)';
-            settingsButton.style.transform = 'scale(1.05)';
-            settingsButton.style.boxShadow = '0 0 12px rgba(185, 103, 255, 0.3)';
-        };
-        settingsButton.onmouseleave = () => {
-            settingsButton.style.backgroundColor = 'rgba(185, 103, 255, 0.1)';
-            settingsButton.style.transform = 'scale(1)';
-            settingsButton.style.boxShadow = '0 0 8px rgba(185, 103, 255, 0.1)';
-        };
+        applyButtonStyle(settingsButton, { fontSize: '20px' });
 
         // Клик
         settingsButton.onclick = (e) => {
             e.preventDefault();
             this.eventBus.emit('screen:show', { screen: 'settings' });
         };
+        // Кнопка паузы (визуальная)
+        const pauseButton = document.createElement('button');
+        pauseButton.innerHTML = '⏸️';
+        pauseButton.title = 'Pause';
+        applyButtonStyle(pauseButton, { fontSize: '20px' });
 
-        // Добавляем оба элемента в контейнер
+        pauseButton.onclick = (e) => {
+            e.preventDefault();
+            this.togglePause();
+        };
+
+        // Сохраняем ссылку для обновления иконки
+        this.pauseButton = pauseButton;
+
+        // Добавляем элементы в контейнер
         headerContainer.appendChild(headerCard);
         headerContainer.appendChild(statsButton);
+
         headerContainer.appendChild(settingsButton);
 
         // 2. Строка с тремя карточками: Level, Speed, Best
@@ -292,7 +276,7 @@ export default class GameScreen {
         this.progressContainer.style.padding = '12px 20px';
         this.progressContainer.style.backgroundColor = 'rgba(0, 20, 20, 0.5)';
         this.progressContainer.style.borderRadius = '8px';
-        this.progressContainer.style.border = '1px solid rgba(0, 255, 255, 0.2)';
+        this.progressContainer.style.border = '1px solid rgba(0, 255, 255, 0.3)';
         this.progressContainer.style.display = 'flex';
         this.progressContainer.style.alignItems = 'center';
         this.progressContainer.style.gap = '16px';
@@ -357,6 +341,18 @@ export default class GameScreen {
         } else {
             this.screenContainer.appendChild(this.uiContainer);
         }
+
+        // Перенос кнопки паузы в нижнюю панель (чтобы было удобнее дотянуться)
+        if (this.pauseButton) {
+            const controlsRow = document.createElement('div');
+            controlsRow.style.display = 'flex';
+            controlsRow.style.width = '100%';
+            controlsRow.style.justifyContent = 'flex-end';
+            controlsRow.style.marginTop = '12px';
+            controlsRow.style.pointerEvents = 'auto';
+            controlsRow.appendChild(this.pauseButton);
+            this.uiContainer.appendChild(controlsRow);
+        }
     }
 
 
@@ -383,6 +379,11 @@ export default class GameScreen {
         };
 
         this.updateUI(uiData);
+        // Ensure pause button reflects current state (paused or not)
+        if (this.pauseButton) {
+            this.pauseButton.innerHTML = this.game.isPaused ? '▶️' : '⏸️';
+            this.pauseButton.title = this.game.isPaused ? 'Resume' : 'Pause';
+        }
         this.eventBus.emit('score:update', uiData);
         this.eventBus.emit('game:reset', { score: 0, level: 1 });
     }
@@ -448,6 +449,20 @@ export default class GameScreen {
             this.show();
         });
         this.eventBus.on('game:togglePause', () => this.togglePause());
+
+        // Обновление иконки кнопки паузы при изменении состояния игры
+        this.eventBus.on('game:pause', () => {
+            if (this.pauseButton) {
+                this.pauseButton.innerHTML = '▶️';
+                this.pauseButton.title = 'Resume';
+            }
+        });
+        this.eventBus.on('game:resume', () => {
+            if (this.pauseButton) {
+                this.pauseButton.innerHTML = '⏸️';
+                this.pauseButton.title = 'Pause';
+            }
+        });
     }
 
     /**
