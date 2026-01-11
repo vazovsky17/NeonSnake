@@ -143,9 +143,12 @@ export default class GameScreen {
         headerContainer.style.justifyContent = 'space-between';
         headerContainer.style.gap = '12px';
         headerContainer.style.width = '100%';
-        headerContainer.style.marginBottom = '4px';
+        headerContainer.style.marginBottom = '12px'; // добавлен отступ между заголовком и остальным UI
         headerContainer.style.pointerEvents = 'auto';
-        this.uiContainer.appendChild(headerContainer);
+        // Keep a reference for sizing calculations
+        this.headerContainer = headerContainer;
+        // Place header at the top of the screen (above progress and canvas)
+        this.screenContainer.insertBefore(headerContainer, this.screenContainer.firstChild);
 
         // Сам заголовок (без изменений)
         const headerCard = document.createElement('div');
@@ -265,7 +268,7 @@ export default class GameScreen {
         statsRow.style.display = 'flex';
         statsRow.style.width = '100%';
         statsRow.style.gap = '12px';
-        statsRow.style.marginBottom = '4px';
+        statsRow.style.marginBottom = '12px';
 
         this.levelCard = document.createElement('div');
         this.levelCard.textContent = 'Level: 1';
@@ -279,11 +282,10 @@ export default class GameScreen {
         this.bestCard.textContent = 'Best: 0';
         cardStyle(this.bestCard);
 
-        // Добавляем в правильном порядке
         statsRow.appendChild(this.levelCard);
         statsRow.appendChild(this.speedCard);
         statsRow.appendChild(this.bestCard);
-        this.uiContainer.appendChild(statsRow);
+        // Не добавляем в this.uiContainer — вставим в DOM между header и progress ниже
 
         // 3. Прогресс до следующего уровня (в одну строку: label → bar → text)
         this.progressContainer = document.createElement('div');
@@ -340,11 +342,21 @@ export default class GameScreen {
         this.progressContainer.appendChild(this.progressBar);
         this.progressContainer.appendChild(this.progressValue);
 
-        this.uiContainer.appendChild(this.progressContainer);
+        // Place the progress bar directly above the canvas so the field has a small gap below it
+        this.progressContainer.style.marginBottom = '12px';
+        this.screenContainer.insertBefore(this.progressContainer, this.canvas);
 
-        // Добавляем в DOM
-        this.canvas.parentNode.appendChild(this.uiContainer);
-        this.screenContainer.insertBefore(this.uiContainer, this.canvas);
+        // Insert statsRow between header and progress so it appears right below header
+        if (statsRow) {
+            this.screenContainer.insertBefore(statsRow, this.progressContainer);
+        }
+
+        // Add the remaining UI under the canvas
+        if (this.canvas.nextSibling) {
+            this.screenContainer.insertBefore(this.uiContainer, this.canvas.nextSibling);
+        } else {
+            this.screenContainer.appendChild(this.uiContainer);
+        }
     }
 
 
@@ -511,48 +523,44 @@ export default class GameScreen {
     resizeCanvas() {
         // Ждём, пока DOM полностью подгрузится
         setTimeout(() => {
-            const container = this.canvas.parentElement;
+            const container = this.screenContainer || this.canvas.parentElement;
             const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
 
-            // Логируем для отладки (можно убрать потом)
-            console.log('Container size:', containerWidth, 'x', containerHeight);
+            // Compute heights of elements above the field
+            const headerHeight = this.headerContainer ? this.headerContainer.offsetHeight : 0;
+            const progressHeight = this.progressContainer ? this.progressContainer.offsetHeight : 0;
 
-            // Целевое соотношение: 1:1 (16x16)
-            const targetRatio = 1;
-            let width = containerWidth * 0.95;
-            let height = width;
+            // Logging
+            console.log('Container width:', containerWidth, 'Header:', headerHeight, 'Progress:', progressHeight);
 
-            // Если высоты не хватает — подгоняем по высоте
-            if (height > containerHeight * 0.95) {
-                height = containerHeight * 0.95;
-                width = height;
-            }
+            // Determine allowed max height for the field relative to viewport
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const maxViewportFraction = isLandscape ? 0.75 : 0.6; // allow more on landscape
+            const maxAllowedFieldHeight = Math.max(80, Math.floor(window.innerHeight * maxViewportFraction) - headerHeight - progressHeight - 20);
 
-            // Минимальный размер клетки — 20px, максимум — под размер
-            const maxCellSize = Math.min(
-                Math.floor(width / this.gridWidth),
-                Math.floor(height / this.gridHeight)
-            );
-            this.cellSize = Math.max(20, maxCellSize); // не меньше 20px
+            // Use container width as primary constraint so field fills width
+            const maxCellByWidth = Math.floor(containerWidth / this.gridWidth);
+            const maxCellByHeight = Math.floor(maxAllowedFieldHeight / this.gridHeight);
+
+            const chosenCell = Math.max(8, Math.min(maxCellByWidth, maxCellByHeight));
+            this.cellSize = chosenCell;
 
             const canvasWidth = this.cellSize * this.gridWidth;
             const canvasHeight = this.cellSize * this.gridHeight;
 
             console.log('Cell size:', this.cellSize, '→ Canvas:', canvasWidth, 'x', canvasHeight);
 
-            // Устанавливаем внутренние размеры (пиксели — важно для чёткости!)
+            // Internal pixel size
             this.canvas.width = canvasWidth;
             this.canvas.height = canvasHeight;
 
-            // Устанавливаем CSS-размер (визуальный)
+            // Visual size — fill available width as close as possible
             this.canvas.style.width = `${canvasWidth}px`;
             this.canvas.style.height = `${canvasHeight}px`;
 
-            // Убедимся, что canvas отцентрирован
-            this.canvas.style.marginLeft = 'auto';
-            this.canvas.style.marginRight = 'auto';
+            // Keep it aligned
             this.canvas.style.display = 'block';
+            this.canvas.style.margin = '0 auto';
         }, 100); // даём время на рендер
     }
 
