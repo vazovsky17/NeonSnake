@@ -21,11 +21,15 @@ export default class ButtonControls {
     createButtons() {
         this.container = document.createElement('div');
         this.container.id = 'game-control-buttons';
+        // Добавляем класс для совместимости с глобальным управлением видимостью
+        this.container.classList.add('controls');
         this.container.style.position = 'absolute';
         this.container.style.bottom = '20px';
         this.container.style.left = '50%';
         this.container.style.transform = 'translateX(-50%)';
-        this.container.style.display = 'flex';
+        // Устанавливаем видимость в соответствии с текущими настройками (если есть)
+        const initialShow = window.app?.settings?.showArrows ?? true;
+        this.container.style.display = initialShow ? 'flex' : 'none';
         this.container.style.flexDirection = 'column';
         this.container.style.alignItems = 'center';
         this.container.style.gap = '10px';

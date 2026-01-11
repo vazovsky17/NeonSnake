@@ -133,9 +133,12 @@ export default class App {
         this.themeService.apply(this.settings.theme);
         this.soundService.setVolume(this.settings.volume / 100);
 
-        const controls = document.querySelector('.controls');
+        // Ищем контейнер кнопок управления (более надёжный селектор)
+        const controls = document.querySelector('#game-control-buttons, .controls');
+        console.debug('App.applySettings: showArrows=', this.settings.showArrows, 'controls=', controls);
         if (controls) {
-            controls.style.display = this.settings.showArrows ? 'grid' : 'none';
+            // Используем 'flex' — соответствует первоначальной раскладке кнопок
+            controls.style.display = this.settings.showArrows ? 'flex' : 'none';
         }
     }
 

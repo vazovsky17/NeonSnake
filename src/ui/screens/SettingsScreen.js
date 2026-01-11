@@ -208,23 +208,10 @@ export default class SettingsScreen {
             volume: Number(form.querySelector('input[name="volume"]').value)
         };
 
-        // Обновляем глобальные настройки
-        this.settings.update(newSettings);
+        // Делегируем обновление приложению через EventBus — App обработает применение и сохранение
+        this.eventBus.emit('settings:change', { ...newSettings });
 
-        // Сохраняем в localStorage (если есть)
-        try {
-            localStorage.setItem('gameSettings', JSON.stringify(this.settings.toJSON()));
-        } catch (e) {
-            console.warn('Не удалось сохранить настройки', e);
-        }
-
-        // Применяем тему
-        this.eventBus.emit('theme:apply', newSettings.theme);
-
-        // Сигнал о обновлении
-        this.eventBus.emit('settings:updated', { ...newSettings });
-
-        console.log('⚙️ Настройки обновлены:', newSettings);
+        console.log('⚙️ Отправлен запрос на изменение настроек:', newSettings);
     }
 
     show() {
