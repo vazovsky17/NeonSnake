@@ -58,14 +58,7 @@ export default class GameScreen {
         // Создаём основной контейнер для UI и canvas
         this.screenContainer = document.createElement('div');
         this.screenContainer.id = 'game-screen-container';
-        this.screenContainer.style.display = 'flex';
-        this.screenContainer.style.flexDirection = 'column';
-        this.screenContainer.style.alignItems = 'center';
-        this.screenContainer.style.justifyContent = 'flex-start';
-        this.screenContainer.style.width = '100%';
-        this.screenContainer.style.height = '100%';
-        this.screenContainer.style.padding = '20px 5%';
-        this.screenContainer.style.boxSizing = 'border-box';
+        // Основной контейнер стилей вынесён в CSS (#game-screen-container) — id уже установлен выше.
 
         // Создаём canvas
         this.canvas = document.createElement('canvas');
@@ -73,18 +66,7 @@ export default class GameScreen {
         this.canvas.className = 'game-canvas';
         this.canvas.tabIndex = 1;
 
-        Object.assign(this.canvas.style, {
-            display: 'block',
-            border: '2px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            background: '#0a0e27',
-            boxShadow: '0 0 20px rgba(0, 255, 255, 0.1)',
-            imageRendering: 'pixelated', // важно для пиксельного вида
-            maxWidth: '100%',
-            height: 'auto',
-            marginLeft: 'auto',
-            marginRight: 'auto',
-        });
+        // Визуальные стили canvas вынесены в CSS (.game-canvas). Следим за размерами через JS.
 
         // Добавляем canvas в контейнер
         this.screenContainer.appendChild(this.canvas);
@@ -108,108 +90,30 @@ export default class GameScreen {
         // Главный контейнер UI
         this.uiContainer = document.createElement('div');
         this.uiContainer.id = 'game-ui';
-        this.uiContainer.style.top = '10px';
-        this.uiContainer.style.width = '100%';
-        this.uiContainer.style.maxWidth = 'none'; 
-        this.uiContainer.style.padding = '0'; 
-        this.uiContainer.style.boxSizing = 'border-box';
-        this.uiContainer.style.zIndex = '20';
-        this.uiContainer.style.fontFamily = 'Orbitron, monospace';
-        this.uiContainer.style.pointerEvents = 'auto';
-
-        // Стиль для карточек
-        const cardStyle = (el) => {
-            el.style.display = 'flex';
-            el.style.justifyContent = 'center';
-            el.style.alignItems = 'center';
-            el.style.flex = '1';               
-            el.style.padding = '12px 10px';    
-            el.style.border = '1px solid rgba(0, 255, 255, 0.3)';
-            el.style.borderRadius = '8px';
-            el.style.color = 'var(--neon-cyan)';
-            el.style.backgroundColor = 'rgba(0, 20, 20, 0.5)';
-            el.style.backdropFilter = 'blur(4px)';
-            el.style.fontSize = '14px';
-            el.style.fontWeight = 'bold';
-            el.style.textAlign = 'center';
-            el.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.1)';
-            el.style.minWidth = '0';           // важно при flex
-        };
-
-        // Применяет стиль похожий на карточки к кнопкам (иконки в 44×44)
-        const applyButtonStyle = (btn, opts = {}) => {
-            cardStyle(btn);
-            btn.style.flex = '0';
-            btn.style.flexShrink = '0';
-            btn.style.padding = opts.padding || '8px';
-            btn.style.boxSizing = 'border-box';
-            btn.style.minWidth = opts.minWidth || '44px';
-            btn.style.height = opts.height || '44px';
-            btn.style.width = opts.width || '44px';
-            btn.style.fontSize = opts.fontSize || '20px';
-            btn.style.fontWeight = 'bold';
-            btn.style.backgroundColor = opts.bg || 'rgba(0, 20, 20, 0.5)';
-            btn.style.color = opts.color || 'var(--neon-purple)';
-            btn.style.cursor = 'pointer';
-            btn.style.transition = 'all 0.18s ease';
-            btn.style.boxShadow = opts.boxShadow || '0 0 8px rgba(0, 255, 255, 0.1)';
-
-            btn.onmouseenter = () => {
-                btn.style.backgroundColor = opts.hoverBg || 'rgba(185, 103, 255, 0.3)';
-                btn.style.transform = 'scale(1.05)';
-                btn.style.boxShadow = opts.hoverBox || '0 0 12px rgba(185, 103, 255, 0.3)';
-            };
-            btn.onmouseleave = () => {
-                btn.style.backgroundColor = opts.bg || 'rgba(185, 103, 255, 0.1)';
-                btn.style.transform = 'scale(1)';
-                btn.style.boxShadow = opts.boxShadow || '0 0 8px rgba(185, 103, 255, 0.1)';
-            };
-        };
 
         // 1. Контейнер для заголовка и кнопки настроек
         const headerContainer = document.createElement('div');
-        headerContainer.style.display = 'flex';
-        headerContainer.style.alignItems = 'center';
-        headerContainer.style.justifyContent = 'space-between';
-        headerContainer.style.gap = '12px';
-        headerContainer.style.width = '100%';
-        headerContainer.style.marginBottom = '12px'; // добавлен отступ между заголовком и остальным UI
-        headerContainer.style.pointerEvents = 'auto';
-        // Keep a reference for sizing calculations
+        headerContainer.classList.add('header-container');
         this.headerContainer = headerContainer;
-        // Place header at the top of the screen (above progress and canvas)
         this.screenContainer.insertBefore(headerContainer, this.screenContainer.firstChild);
 
-        // Сам заголовок (без изменений)
+        // Сам заголовок 
         const headerCard = document.createElement('div');
-        headerCard.style.display = 'flex';
-        headerCard.style.justifyContent = 'space-between';
-        headerCard.style.alignItems = 'center';
-        headerCard.style.padding = '12px 20px';
-        headerCard.style.flex = '1';
-        headerCard.style.border = '1px solid rgba(0, 255, 255, 0.3)';
-        headerCard.style.borderRadius = '8px';
-        headerCard.style.color = 'var(--neon-green)';
-        headerCard.style.backgroundColor = 'rgba(0, 20, 20, 0.5)';
-        headerCard.style.backdropFilter = 'blur(4px)';
-        headerCard.style.fontSize = '16px';
-        headerCard.style.fontWeight = 'bold';
-        headerCard.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.1)';
-        headerCard.style.textShadow = '0 0 5px var(--neon-green)';
+        headerCard.classList.add('header-card');
 
         this.title = document.createElement('span');
         this.title.textContent = 'Neon Snake';
 
         this.scoreLabel = document.createElement('span');
         this.scoreLabel.textContent = 'Score: 0';
-        this.scoreLabel.style.color = 'var(--neon-yellow)';
+        this.scoreLabel.classList.add('score-label');
 
         headerCard.appendChild(this.title);
         headerCard.appendChild(this.scoreLabel);
 
         const statsButton = document.createElement('button');
-        statsButton.innerHTML = '📊'; // или '📈' — на выбор
-        applyButtonStyle(statsButton, { fontSize: '20px' });
+        statsButton.innerHTML = '📊';
+        statsButton.classList.add('icon-btn');
 
         // Клик — переход на экран статистики
         statsButton.onclick = (e) => {
@@ -220,97 +124,67 @@ export default class GameScreen {
         // Кнопка настроек 
         const settingsButton = document.createElement('button');
         settingsButton.innerHTML = '⚙️';
-        applyButtonStyle(settingsButton, { fontSize: '20px' });
+        settingsButton.classList.add('icon-btn');
 
-        // Клик
         settingsButton.onclick = (e) => {
             e.preventDefault();
             this.eventBus.emit('screen:show', { screen: 'settings' });
         };
-        // Кнопка паузы (визуальная)
+        
+        // Кнопка паузы 
         const pauseButton = document.createElement('button');
         pauseButton.innerHTML = '⏸️';
         pauseButton.title = 'Pause';
-        applyButtonStyle(pauseButton, { fontSize: '20px' });
+        pauseButton.classList.add('icon-btn');
 
         pauseButton.onclick = (e) => {
             e.preventDefault();
             this.togglePause();
         };
 
-        // Сохраняем ссылку для обновления иконки
         this.pauseButton = pauseButton;
 
         // Добавляем элементы в контейнер
         headerContainer.appendChild(headerCard);
         headerContainer.appendChild(statsButton);
-
         headerContainer.appendChild(settingsButton);
 
         // 2. Строка с тремя карточками: Level, Speed, Best
         const statsRow = document.createElement('div');
-        statsRow.style.display = 'flex';
-        statsRow.style.width = '100%';
-        statsRow.style.gap = '12px';
-        statsRow.style.marginBottom = '12px';
+        statsRow.classList.add('stats-row');
 
         this.levelCard = document.createElement('div');
         this.levelCard.textContent = 'Level: 1';
-        cardStyle(this.levelCard);
+        this.levelCard.classList.add('ui-card');
 
         this.speedCard = document.createElement('div');
         this.speedCard.textContent = 'Speed: 0';
-        cardStyle(this.speedCard);
+        this.speedCard.classList.add('ui-card');
 
         this.bestCard = document.createElement('div');
         this.bestCard.textContent = 'Best: 0';
-        cardStyle(this.bestCard);
+        this.bestCard.classList.add('ui-card');
 
         statsRow.appendChild(this.levelCard);
         statsRow.appendChild(this.speedCard);
         statsRow.appendChild(this.bestCard);
-        // Не добавляем в this.uiContainer — вставим в DOM между header и progress ниже
-
+ 
         // 3. Прогресс до следующего уровня (в одну строку: label → bar → text)
         this.progressContainer = document.createElement('div');
-        this.progressContainer.style.padding = '12px 20px';
-        this.progressContainer.style.backgroundColor = 'rgba(0, 20, 20, 0.5)';
-        this.progressContainer.style.borderRadius = '8px';
-        this.progressContainer.style.border = '1px solid rgba(0, 255, 255, 0.3)';
-        this.progressContainer.style.display = 'flex';
-        this.progressContainer.style.alignItems = 'center';
-        this.progressContainer.style.gap = '16px';
-        this.progressContainer.style.fontSize = '12px';
-        this.progressContainer.style.color = 'var(--neon-blue)';
-        this.progressContainer.style.width = '100%';
-        this.progressContainer.style.boxSizing = 'border-box';
+        this.progressContainer.classList.add('progress-container');
 
         // Счёт: "3/5"
         this.progressValue = document.createElement('div');
-        this.progressValue.style.fontFamily = 'monospace';
-        this.progressValue.style.fontWeight = 'bold';
-        this.progressValue.style.color = 'var(--neon-green)';
-        this.progressValue.style.fontSize = '13px';
-        this.progressValue.style.flexShrink = '0';
+        this.progressValue.classList.add('progress-value');
 
         // Полоса прогресса (растягивается)
         this.progressBar = document.createElement('div');
-        this.progressBar.style.display = 'flex';
-        this.progressBar.style.flex = '1';
-        this.progressBar.style.gap = '1px';
-        this.progressBar.style.minWidth = '0';
-        this.progressBar.style.justifyContent = 'flex-start';
-        this.progressBar.style.borderRadius = '8px';
-        this.progressBar.style.border = '1px solid rgba(0, 255, 255, 0.2)';
+        this.progressBar.classList.add('progress-bar');
 
         this.progressBlocks = [];
         for (let i = 0; i < 10; i++) {
             const block = document.createElement('div');
-            block.style.flex = `1`;
-            block.style.minWidth = '4px';
-            block.style.height = '8px';
-            block.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            block.style.transition = 'background-color 0.2s ease';
+            block.classList.add('progress-block');
             this.progressBlocks.push(block);
             this.progressBar.appendChild(block);
         }
@@ -318,16 +192,13 @@ export default class GameScreen {
         // Надпись "Next level"
         this.progressLabel = document.createElement('div');
         this.progressLabel.textContent = 'Next level';
-        this.progressLabel.style.fontSize = '11px';
-        this.progressLabel.style.opacity = '0.9';
-        this.progressLabel.style.flexShrink = '0';
+        this.progressLabel.classList.add('progress-label');
 
         this.progressContainer.appendChild(this.progressLabel);
         this.progressContainer.appendChild(this.progressBar);
         this.progressContainer.appendChild(this.progressValue);
 
-        // Place the progress bar directly above the canvas so the field has a small gap below it
-        this.progressContainer.style.marginBottom = '12px';
+        // Place the progress bar directly above the canvas
         this.screenContainer.insertBefore(this.progressContainer, this.canvas);
 
         // Insert statsRow between header and progress so it appears right below header
@@ -345,11 +216,7 @@ export default class GameScreen {
         // Перенос кнопки паузы в нижнюю панель (чтобы было удобнее дотянуться)
         if (this.pauseButton) {
             const controlsRow = document.createElement('div');
-            controlsRow.style.display = 'flex';
-            controlsRow.style.width = '100%';
-            controlsRow.style.justifyContent = 'flex-end';
-            controlsRow.style.marginTop = '12px';
-            controlsRow.style.pointerEvents = 'auto';
+            controlsRow.classList.add('controls-row');
             controlsRow.appendChild(this.pauseButton);
             this.uiContainer.appendChild(controlsRow);
         }
@@ -575,7 +442,6 @@ export default class GameScreen {
 
             // Keep it aligned
             this.canvas.style.display = 'block';
-            this.canvas.style.margin = '0 auto';
         }, 100); // даём время на рендер
     }
 
