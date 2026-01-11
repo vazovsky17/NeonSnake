@@ -325,6 +325,29 @@
     animation: glitch-btn 1s infinite linear;
 }
 
+/* Хакерский эффект при нажатии — короткий, резкий глитч */
+.hacker-btn:active,
+.hacker-btn:focus:active,
+.hacker-btn:active:focus {
+    animation: glitch-press 0.36s linear;
+    color: var(--neon-yellow);
+    text-shadow:
+        -6px 0 var(--neon-pink),
+        6px 0 var(--neon-blue),
+        0 0 18px var(--neon-yellow);
+    box-shadow:
+        0 0 30px var(--accent-glow),
+        inset 0 0 20px var(--accent-glow);
+    transform: translateY(0) translateX(0) scale(0.98);
+    outline: none;
+}
+
+/* Быстрая анимация градиента при нажатии */
+.hacker-btn:active::before {
+    transform: translateX(100%);
+    transition: transform 0.15s ease;
+}
+
 @keyframes glitch-btn {
 
     0%,
@@ -343,6 +366,74 @@
     75% {
         text-shadow: -1px -1px var(--neon-purple), 1px 1px var(--neon-green);
     }
+}
+
+/* Быстрый глитч при нажатии */
+@keyframes glitch-press {
+    0% { text-shadow: 0 0 5px var(--neon-cyan); transform: translateX(0); }
+    20% { text-shadow: -8px 0 var(--neon-pink), 8px 0 var(--neon-blue); transform: translateX(-2px); }
+    40% { text-shadow: 8px 0 var(--neon-pink), -8px 0 var(--neon-blue); transform: translateX(2px); }
+    60% { text-shadow: -6px -2px var(--neon-purple), 6px 2px var(--neon-green); transform: translateX(-1px); }
+    80% { text-shadow: 6px 2px var(--neon-purple), -6px -2px var(--neon-green); transform: translateX(1px); }
+    100% { text-shadow: 0 0 10px var(--neon-yellow); transform: translateX(0); }
+}
+
+/* Хакерское движение в состоянии покоя для выбранных кнопок */
+.hacker-btn.idle,
+.hacker-btn--idle {
+    /* Лёгкое покачивание, почти незаметное — даёт ощущение жизни */
+    animation: hacker-idle 3.8s ease-in-out infinite;
+    will-change: transform, text-shadow;
+
+    /* Цвета и свечения такие же, как при :hover */
+    color: var(--neon-green);
+    text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+    box-shadow:
+        0 0 20px var(--accent-glow),
+        inset 0 0 15px var(--accent-glow);
+    border-color: var(--neon-green);
+}
+
+.hacker-btn.idle::before,
+.hacker-btn--idle::before {
+    /* Медленное движение градиента */
+    transform: translateX(-50%);
+    animation: idle-gradient 6s linear infinite;
+}
+
+/* Более редкие и деликатные изменения текста/тени */
+@keyframes hacker-idle {
+    0% {
+        transform: translateY(0) translateX(0) rotate(0deg);
+        text-shadow: 0 0 6px var(--neon-cyan);
+        box-shadow: 0 0 10px var(--accent-glow);
+    }
+    20% {
+        transform: translateY(-1px) translateX(-1px) rotate(-0.2deg);
+        text-shadow: -2px 0 var(--neon-pink);
+    }
+    40% {
+        transform: translateY(1px) translateX(1px) rotate(0.2deg);
+        text-shadow: 2px 0 var(--neon-blue);
+    }
+    60% {
+        transform: translateY(-0.5px) translateX(0.5px) rotate(-0.1deg);
+        text-shadow: -1px -1px var(--neon-purple);
+    }
+    80% {
+        transform: translateY(0.5px) translateX(-0.5px) rotate(0.1deg);
+        text-shadow: 1px 1px var(--neon-green);
+    }
+    100% {
+        transform: translateY(0) translateX(0) rotate(0deg);
+        text-shadow: 0 0 6px var(--neon-cyan);
+    }
+}
+
+@keyframes idle-gradient {
+    0% { transform: translateX(-100%); opacity: 0.6; }
+    50% { transform: translateX(25%); opacity: 1; }
+    100% { transform: translateX(-100%); opacity: 0.6; }
 }
 
 /* === СНЭКБАР === */

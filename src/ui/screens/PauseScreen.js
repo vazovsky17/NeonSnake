@@ -34,6 +34,9 @@ export default class PauseScreen {
         this.restartBtn = this.element.querySelector('#pauseRestart');
         this.menuBtn = this.element.querySelector('#pauseMenu');
 
+        // Небольшое покачивание для Resume — чтобы кнопка выглядела «живой»
+        if (this.resumeBtn) this.resumeBtn.classList.add('idle');
+
         this.bindEvents();
     }
 

@@ -35,6 +35,9 @@ export default class GameOverScreen {
         this.leaderboardBtn = this.element.querySelector('#gameOverLeaderboard');
         this.shareBtn = this.element.querySelector('#gameOverShare'); // ← инициализация
 
+        // Применяем «idle» эффект к кнопке Play Again
+        if (this.restartBtn) this.restartBtn.classList.add('idle');
+
         this.bindEvents();
     }
 

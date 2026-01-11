@@ -9,6 +9,7 @@ export default class SettingsScreen {
         this.eventBus = app.eventBus;
         this.settings = app.settings;
         this.screenElement = null;
+        this._saveTimeout = null; // таймер для дебаунса сохранения (ползунок громкости) 
 
         this.init();
     }
@@ -65,12 +66,11 @@ export default class SettingsScreen {
                 </div>
 
                 <div class="btn-group">
-                    <button type="button" name="save" class="hacker-btn">SAVE</button>
-                    <button type="button" name="close" class="hacker-btn">BACK</button>
+                    <button type="button" name="close" class="hacker-btn">CLOSE</button>
                 </div>
 
                 <div class="modal-hint">
-                    <small>ESC: Back • ENTER: Save</small>
+                    <small>ESC: Close</small>
                 </div>
             </div>
         `;
@@ -82,12 +82,19 @@ export default class SettingsScreen {
         const form = this.screenElement;
         const inputs = form.querySelectorAll('input, select');
 
-        // Обновляем метку громкости
+        // Обновляем метку громкости и сохраняем настройки при движении с небольшой задержкой
         const volumeInput = form.querySelector('input[name="volume"]');
         const volumeLabel = form.querySelector('[name="volumeLabel"]');
-        volumeInput.addEventListener('input', () => {
-            volumeLabel.textContent = volumeInput.value;
-        });
+        if (volumeInput && volumeLabel) {
+            volumeInput.addEventListener('input', () => {
+                volumeLabel.textContent = volumeInput.value;
+                if (this._saveTimeout) clearTimeout(this._saveTimeout);
+                this._saveTimeout = setTimeout(() => {
+                    this.saveSettings();
+                    this._saveTimeout = null;
+                }, 180);
+            });
+        }
 
         // События изменений
         inputs.forEach(input => {
@@ -97,13 +104,19 @@ export default class SettingsScreen {
         });
 
         // Кнопки
-        form.querySelector('[name="save"]').addEventListener('click', () => {
-            this.saveSettings();
-        });
+        const saveBtn = form.querySelector('[name="save"]');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.saveSettings();
+            });
+        }
 
-        form.querySelector('[name="close"]').addEventListener('click', () => {
-            this.hide();
-        });
+        const closeBtn = form.querySelector('[name="close"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hide();
+            });
+        }
 
         // Закрытие по ESC
         document.addEventListener('keydown', (e) => {
@@ -111,10 +124,6 @@ export default class SettingsScreen {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 this.hide();
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.saveSettings();
             }
         });
 
@@ -149,12 +158,7 @@ export default class SettingsScreen {
 
         this.eventBus.emit('settings:change', { ...newSettings });
 
-        // Можно добавить snackbar
-        this.eventBus.emit('snackbar:show', {
-            message: '✅ Settings saved!',
-            type: 'success'
-        });
-
+        // Применяем настройки сразу при изменении — уведомления не показываем (избегаем спама)
         console.log('⚙️ Settings updated:', newSettings);
     }
 

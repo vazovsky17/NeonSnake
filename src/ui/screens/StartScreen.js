@@ -64,13 +64,17 @@ export default class StartScreen {
     createButtons() {
         const container = this.element.querySelector('.btn-group');
 
+        // Создаём кнопку и сохраняем экземпляр, затем добавляем в контейнер
         this.playButton = new Button({
             text: 'PLAY GAME',
             onClick: () => {
                 this.hide();
                 this.eventBus.emit('game:start');
             }
-        }).appendTo(container);
+        });
+        this.playButton.appendTo(container);
+        // Добавляем «покойный» хакерский эффект
+        this.playButton.getElement().classList.add('idle');
     }
 
     bindEvents() {
