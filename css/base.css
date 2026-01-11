@@ -1,0 +1,204 @@
+/* === ТЕМЫ === */
+:root {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+
+    /* Киберпанк 2077 / Digital Neon */
+    --neon-pink: #ff006e;
+    --neon-cyan: #00f5ff;
+    --neon-purple: #b967ff;
+    --neon-green: #0aff00; /* Яркий неон, как в хакерских интерфейсах */
+    --neon-red: #ff0f33;
+    --dark-bg: #060914; /* Почти чёрный */
+    --grid-bg: #0a0e27;
+    --text-color: var(--neon-cyan);
+    --btn-primary: var(--neon-green);
+
+    /* Эффекты */
+    --glitch-shadow: 0 0 15px var(--neon-cyan), 0 0 30px var(--neon-purple);
+
+    /* Фон сканирования */
+    --scanline-bg: 
+        linear-gradient(0deg, rgba(10, 14, 39, 0.9), rgba(10, 14, 39, 0.9)),
+        repeating-linear-gradient(0deg, 
+            transparent, 
+            transparent 1px, 
+            rgba(0, 245, 255, 0.05) 1px, 
+            rgba(0, 245, 255, 0.05) 2px
+        );
+
+    /* Шум (noise) — как на CRT-экране */
+    --noise-bg: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* === Темы === */
+[data-theme="matrix"] {
+    --neon-pink: #00ff41;
+    --neon-blue: #00ff41;
+    --neon-purple: #008f11;
+    --neon-green: #00ff41;
+    --dark-bg: #0d0208;
+    --grid-bg: #001a00;
+    --text-color: var(--neon-green);
+    --btn-primary: var(--neon-green);
+}
+
+[data-theme="sunset"] {
+    --neon-pink: #ff6b35;
+    --neon-blue: #f7931e;
+    --neon-purple: #c1121f;
+    --neon-green: #ffd60a;
+    --dark-bg: #1a0a0f;
+    --grid-bg: #2d1b20;
+    --text-color: var(--neon-pink);
+    --btn-primary: var(--neon-pink);
+}
+
+[data-theme="ocean"] {
+    --neon-pink: #4cc9f0;
+    --neon-blue: #4361ee;
+    --neon-purple: #7209b7;
+    --neon-green: #4cc9f0;
+    --dark-bg: #03045e;
+    --grid-bg: #0b132b;
+    --text-color: var(--neon-blue);
+    --btn-primary: var(--neon-blue);
+}
+
+[data-theme="retro"] {
+    --neon-pink: #ff006e;
+    --neon-blue: #ff7aa3;
+    --neon-purple: #fb5607;
+    --neon-green: #ffbe0b;
+    --dark-bg: #2b0a3d;
+    --grid-bg: #3d1152;
+    --text-color: var(--neon-pink);
+    --btn-primary: var(--neon-pink);
+}
+
+[data-theme="toxic"] {
+    --neon-pink: #ccff00;
+    --neon-blue: #00ff99;
+    --neon-purple: #39ff14;
+    --neon-green: #ccff00;
+    --dark-bg: #0a1e0a;
+    --grid-bg: #1a2e1a;
+    --text-color: var(--neon-green);
+    --btn-primary: var(--neon-green);
+}
+
+/* === Сброс === */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Гарантируем, что #app и body занимают весь экран */
+html, body, #app {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+/* === Типографика === */
+html {
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* === Основной фон и эффекты === */
+body {
+    font-family: 'Exo 2', 'Orbitron', monospace;
+    color: var(--text-color);
+    background: var(--scanline-bg), var(--noise-bg);
+    background-size: 100% 2px, 200% 200%;
+    background-blend-mode: normal, multiply;
+    min-height: 100vh;
+    overflow: hidden;
+    position: relative;
+    text-shadow: 0 0 5px rgba(0, 245, 255, 0.4);
+}
+
+/* Эффект сканирования — как в старых мониторах */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0, 245, 255, 0.03) 50%,
+        transparent 100%
+    );
+    background-size: 100% 4px;
+    animation: scanline 8s linear infinite;
+    opacity: 0.2;
+    mix-blend-mode: overlay;
+    will-change: transform;
+    z-index: 1;
+}
+
+/* Анимация сканирования */
+@keyframes scanline {
+    0% { transform: translateY(-100vh); }
+    100% { transform: translateY(100vh); }
+}
+
+/* === Экраны (модалки) === */
+.screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+    background: rgba(10, 14, 39, 0.95);
+}
+
+.screen.show {
+    display: flex;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* === Доступность: уменьшение анимаций === */
+@media (prefers-reduced-motion: reduce) {
+    body::before {
+        animation: none;
+        opacity: 0;
+    }
+
+    .screen.show {
+        animation: none;
+        opacity: 1;
+    }
+
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

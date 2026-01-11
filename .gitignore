@@ -8,7 +8,34 @@ Thumbs.db
 # Логи и временные
 *.log
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# OS
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnpm-debug.log*
+
+# Build и dist
+/dist
+/build
+/out
+/.next
+/nuxt
+/.nuxt
+/output
+
+# IDE
+.idea/
 *.swp
 *.swo
+.vs/
+
+# Кэш
+.cache
+.npm
+.yarn

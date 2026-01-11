@@ -6,263 +6,30 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Neon Snake - Telegram Mini App</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/modals.css">
+    <!-- Подключение Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Font Awesome для иконок -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Exo+2&display=swap">
+
+    <!-- Локальные стили -->
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/screens.css">
 </head>
 
 <body>
-    <div id="app">
-        <!-- Header -->
-        <div class="header">
-            <div class="title">NEON SNAKE</div>
-            <div class="score">Score: <span id="score">0</span></div>
-        </div>
+    <!-- Основной контейнер (может использоваться в будущем) -->
+    <div id="app"></div>
 
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-label">Level</div>
-                <div class="stat-value" id="level">1</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Speed</div>
-                <div class="stat-value" id="speed">1x</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Best</div>
-                <div class="stat-value" id="highScore">0</div>
-            </div>
-        </div>
-
-        <!-- Level Progress Bar -->
-        <div class="level-progress">
-            <div class="level-progress-header">
-                <span class="level-progress-label">Next Level</span>
-                <span class="level-progress-text" id="levelProgressText">0/3</span>
-            </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar" id="progressBar" style="width: 0%;"></div>
-            </div>
-        </div>
-
-        <!-- Game -->
-        <div class="game-container">
-            <canvas id="gameCanvas"></canvas>
-        </div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <button class="control-btn up" id="upBtn" aria-label="Вверх">
-                <i class="fa-solid fa-arrow-up"></i>
-            </button>
-            <button class="control-btn left" id="leftBtn" aria-label="Влево">
-                <i class="fa-solid fa-arrow-left"></i>
-            </button>
-            <button class="control-btn down" id="downBtn" aria-label="Вниз">
-                <i class="fa-solid fa-arrow-down"></i>
-            </button>
-            <button class="control-btn right" id="rightBtn" aria-label="Вправо">
-                <i class="fa-solid fa-arrow-right"></i>
-            </button>
-        </div>
-
-        <!-- Right-side fixed buttons -->
-        <div class="right-stack" aria-hidden="false">
-            <button class="pause-btn" id="pauseBtn" aria-label="Пауза">
-                <i class="fa-solid fa-pause"></i>
-            </button>
-            <button class="theme-btn" id="themeBtn" aria-label="Выбрать тему">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-            <button class="stats-btn" id="statsBtn" aria-label="Статистика">
-                <i class="fa-solid fa-chart-line"></i>
-            </button>
-            <button class="settings-btn" id="settingsBtn" aria-label="Настройки">
-                <i class="fa-solid fa-gear"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- Start Screen -->
-    <div class="start-screen" id="startScreen">
-        <div class="start-content">
-            <h1 class="start-title">NEON SNAKE</h1>
-            <p class="start-description">
-                Collect food 🍎, grow your snake 🐍 and get faster ⚡.<br>
-                🎮 Controls: buttons, swipes, or WASD/arrow keys.<br>
-                ⚡ Levels increase difficulty as you progress.
-            </p>
-            <button class="start-btn" id="startBtn">START GAME</button>
-        </div>
-    </div>
-
-    <!-- Game Over Screen -->
-    <div class="game-over" id="gameOver">
-        <div class="game-over-content">
-            <h2 class="game-over-title">GAME OVER</h2>
-            <div class="final-score">Score: <span id="finalScore">0</span></div>
-            <div class="level-up-notice" id="levelUpNotice"></div>
-            <button class="restart-btn" id="restartBtn">
-                <i class="fa-solid fa-play"></i> PLAY AGAIN
-            </button>
-            <button class="share-btn" id="shareScoreBtn">
-                <i class="fa-solid fa-share"></i> Share
-            </button>
-        </div>
-    </div>
-
-    <!-- Pause Screen -->
-    <div class="pause-screen" id="pauseScreen">
-        <div class="pause-content">
-            <h2 class="pause-title">⏸ PAUSED</h2>
-            <div class="pause-stats">
-                <div class="pause-stat">
-                    <div class="pause-stat-label">Score</div>
-                    <div class="pause-stat-value" id="pauseScore">0</div>
-                </div>
-                <div class="pause-stat">
-                    <div class="pause-stat-label">Level</div>
-                    <div class="pause-stat-value" id="pauseLevel">1</div>
-                </div>
-            </div>
-            <div class="pause-buttons">
-                <button class="pause-resume-btn" id="resumeBtn">▶ Resume</button>
-                <button class="pause-quit-btn" id="quitBtn">⏹ Quit Game</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Theme Modal -->
-    <div class="theme-modal" id="themeModal">
-        <div class="modal-content theme-modal-content">
-            <div class="modal-scroll-area">
-                <div class="modal-body">
-                    <h2 class="theme-modal-title">Choose Theme</h2>
-                    <div class="theme-grid">
-                        <div class="theme-option active" data-theme="cyberpunk">
-                            <div class="theme-name" style="color: #ff006e;">Cyberpunk</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #ff006e;"></div>
-                                <div class="theme-color" style="background: #00f5ff;"></div>
-                                <div class="theme-color" style="background: #b967ff;"></div>
-                            </div>
-                        </div>
-                        <div class="theme-option" data-theme="matrix">
-                            <div class="theme-name" style="color: #00ff41;">Matrix</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #00ff41;"></div>
-                                <div class="theme-color" style="background: #00ff41;"></div>
-                                <div class="theme-color" style="background: #008f11;"></div>
-                            </div>
-                        </div>
-                        <div class="theme-option" data-theme="sunset">
-                            <div class="theme-name" style="color: #ff6b35;">Sunset</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #ff6b35;"></div>
-                                <div class="theme-color" style="background: #f7931e;"></div>
-                                <div class="theme-color" style="background: #c1121f;"></div>
-                            </div>
-                        </div>
-                        <div class="theme-option" data-theme="ocean">
-                            <div class="theme-name" style="color: #4cc9f0;">Ocean</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #4cc9f0;"></div>
-                                <div class="theme-color" style="background: #4361ee;"></div>
-                                <div class="theme-color" style="background: #7209b7;"></div>
-                            </div>
-                        </div>
-                        <div class="theme-option" data-theme="retro">
-                            <div class="theme-name" style="color: #ff006e;">Retro</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #ff006e;"></div>
-                                <div class="theme-color" style="background: #ff7aa3;"></div>
-                                <div class="theme-color" style="background: #fb5607;"></div>
-                            </div>
-                        </div>
-                        <div class="theme-option" data-theme="toxic">
-                            <div class="theme-name" style="color: #ccff00;">Toxic</div>
-                            <div class="theme-preview">
-                                <div class="theme-color" style="background: #ccff00;"></div>
-                                <div class="theme-color" style="background: #00ff99;"></div>
-                                <div class="theme-color" style="background: #39ff14;"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="theme-close-btn" id="themeCloseBtn">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stats Modal -->
-    <div class="stats-modal" id="statsModal">
-        <div class="modal-content stats-modal-content">
-            <div class="modal-scroll-area">
-                <div class="modal-body">
-                    <h2 class="stats-modal-title">🏆 Leaderboard</h2>
-                    <div class="stats-tabs">
-                        <button class="stats-tab active" data-tab="global">Global</button>
-                        <button class="stats-tab" data-tab="personal">My Stats</button>
-                    </div>
-                    <div id="statsContent">
-                        <div class="loading">Loading stats...</div>
-                    </div>
-                    <button class="stats-close-btn" id="statsCloseBtn">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <!-- Settings Modal -->
-    <div class="settings-modal" id="settingsModal">
-        <div class="modal-content settings-modal-content">
-            <div class="modal-scroll-area">
-                <div class="modal-body">
-                    <h2 class="settings-modal-title">Settings</h2>
-                    <div class="settings-list">
-                        <label class="settings-item">
-                            <span class="settings-label-text">Show arrows</span>
-                            <input type="checkbox" id="showArrowsCheckbox">
-                        </label>
-                        <label class="settings-item">
-                            <span class="settings-label-text">Sound</span>
-                            <input type="checkbox" id="soundToggle"> <!-- ✅ Изменено -->
-                        </label>
-                        <label class="settings-item settings-volume">
-                            <span class="settings-label-text">Volume</span>
-                            <div class="settings-volume-control">
-                                <input type="range" id="volumeRange" min="0" max="100" step="1" value="80">
-                                <span id="volumeValue">80%</span>
-                            </div>
-                        </label>
-                        <label class="settings-item">
-                            <span class="settings-label-text">Vibration</span>
-                            <input type="checkbox" id="vibrationToggle"> <!-- ✅ Изменено -->
-                        </label>
-                    </div>
-                    <button class="danger-btn" id="resetDataBtn">❌ Reset All Data</button>
-                    <button class="stats-close-btn" id="settingsCloseBtn">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Snackbar -->
+    <!-- Snackbar для уведомлений -->
     <div class="snackbar" id="snackbar"></div>
 
-    <!-- Scripts -->
-    <script src="js/soundManager.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/theme.js"></script>
-    <script src="js/stats.js"></script>
-    <script src="js/controls.js"></script>
-    <script src="js/settings.js"></script>
+    <!-- Главный модуль приложения -->
+    <script type="module" src="./src/main.js"></script>
 </body>
 
 </html>

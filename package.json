@@ -1,0 +1,29 @@
+{
+  "name": "neonsnake",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vazovsky17/NeonSnake.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/vazovsky17/NeonSnake/issues"
+  },
+  "homepage": "https://github.com/vazovsky17/NeonSnake#readme",
+  "devDependencies": {
+    "vite": "^7.3.0"
+  }
+}
