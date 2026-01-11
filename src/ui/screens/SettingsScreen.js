@@ -217,11 +217,14 @@ export default class SettingsScreen {
     show() {
         this.updateForm();
         this.screenElement.classList.add('show');
+        // Трактуем полноэкранный экран настроек как UI-слой, который должен ставить игру на паузу
+        this.eventBus.emit('ui:modal:open');
         this.eventBus.emit('screen:shown', { screen: 'settings' });
     }
 
     hide() {
         this.screenElement.classList.remove('show');
+        this.eventBus.emit('ui:modal:close');
         this.eventBus.emit('screen:hidden', { screen: 'settings' });
     }
 }

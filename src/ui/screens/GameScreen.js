@@ -130,7 +130,7 @@ export default class GameScreen {
             e.preventDefault();
             this.eventBus.emit('screen:show', { screen: 'settings' });
         };
-        
+
         // Кнопка паузы 
         const pauseButton = document.createElement('button');
         pauseButton.innerHTML = '⏸️';
@@ -139,7 +139,13 @@ export default class GameScreen {
 
         pauseButton.onclick = (e) => {
             e.preventDefault();
-            this.togglePause();
+            console.debug('pauseButton clicked');
+            const emitted = this.eventBus.emit('game:togglePause');
+            // Если никого не подписано (в редком случае инициализации), выполним локально
+            if (!emitted) {
+                console.debug('game:togglePause had no listeners, calling togglePause directly');
+                this.togglePause();
+            }
         };
 
         this.pauseButton = pauseButton;
@@ -217,6 +223,15 @@ export default class GameScreen {
         if (this.pauseButton) {
             const controlsRow = document.createElement('div');
             controlsRow.classList.add('controls-row');
+            // Размещаем controlsRow поверх canvas
+            controlsRow.style.position = 'relative';
+            controlsRow.style.zIndex = '40';
+            // Защита: убедимся, что кнопка видима сверху и принимает события
+            this.pauseButton.style.zIndex = '50';
+            this.pauseButton.style.pointerEvents = 'auto';
+            this.pauseButton.tabIndex = 0;
+            this.pauseButton.addEventListener('pointerdown', (e) => console.debug('pauseButton pointerdown', e));
+            this.pauseButton.addEventListener('click', (e) => console.debug('pauseButton click event', e));
             controlsRow.appendChild(this.pauseButton);
             this.uiContainer.appendChild(controlsRow);
         }
@@ -308,14 +323,18 @@ export default class GameScreen {
         });
 
         // События из EventBus
-        this.eventBus.on('game:pause', () => this.pause());
-        this.eventBus.on('game:resume', () => this.resume());
+        // Передаём payload (например { silent: true }) дальше — чтобы флаги не терялись
+        this.eventBus.on('game:pause', (data) => this.pause(data));
+        this.eventBus.on('game:resume', (data) => this.resume(data));
         this.eventBus.on('game:restart', () => this.restart());
         this.eventBus.on('app:blur', () => this.pause());
         this.eventBus.on('game:start', () => {
             this.show();
         });
-        this.eventBus.on('game:togglePause', () => this.togglePause());
+        this.eventBus.on('game:togglePause', (data) => {
+            console.debug('game:togglePause received', data);
+            this.togglePause();
+        });
 
         // Обновление иконки кнопки паузы при изменении состояния игры
         this.eventBus.on('game:pause', () => {
@@ -758,20 +777,23 @@ export default class GameScreen {
         }
     }
 
-    pause() {
+    pause(data = {}) {
         if (this.game.isRunning && !this.game.isPaused) {
             const result = this.game.pause();
             if (result) {
-                this.eventBus.emit('game:pause', result);
+                // Сохраняем флаги из внешнего контекста (например { silent: true })
+                const payload = Object.assign({}, result, data);
+                this.eventBus.emit('game:pause', payload);
             }
         }
     }
 
-    resume() {
+    resume(data = {}) {
         if (this.game.isRunning && this.game.isPaused) {
             const result = this.game.resume();
             if (result) {
-                this.eventBus.emit('game:resume', result);
+                const payload = Object.assign({}, result, data);
+                this.eventBus.emit('game:resume', payload);
             }
         }
     }

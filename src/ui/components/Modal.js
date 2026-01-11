@@ -8,10 +8,18 @@ export default class Modal {
 
     show() {
         this.element.classList.add('show');
+        // Сообщаем приложению, что открыт UI-слой (модалка)
+        if (this.eventBus) {
+            this.eventBus.emit('ui:modal:open');
+        }
     }
 
     hide() {
         this.element.classList.remove('show');
+        // Сообщаем приложению, что UI-слой закрыт
+        if (this.eventBus) {
+            this.eventBus.emit('ui:modal:close');
+        }
     }
 
     bindEvents() {

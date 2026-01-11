@@ -39,6 +39,9 @@ export default class App {
         this.gameOverScreen = null;
         this.settingsScreen = null;
 
+        // Счётчик открытых UI-слоёв (модалки, полноэкранные настройки и т.д.)
+        this._uiModalCount = 0;
+
         // Инициализация
         this.init();
     }
@@ -178,5 +181,40 @@ export default class App {
                 this.eventBus.emit('app:visible');
             }
         });
-    }
+        // Track global pause state
+        this._isGamePaused = false;
+        this.eventBus.on('game:pause', () => { this._isGamePaused = true; });
+        this.eventBus.on('game:resume', () => { this._isGamePaused = false; });
+
+        // Управление состоянием паузы при открытии/закрытии модалок/полноэкранных UI
+        this.eventBus.on('ui:modal:open', () => {
+            this._uiModalCount = (this._uiModalCount || 0) + 1;
+            console.debug('App: modal opened, count=', this._uiModalCount);
+            if (this._uiModalCount === 1) {
+                // Запомним, был ли игровой экран в паузе до открытия модалки
+                this._wasGamePausedBeforeModal = !!this._isGamePaused;
+
+                // Спрячем оверлей паузы, чтобы модалка была видна
+                this.eventBus.emit('pause:hideOverlay');
+
+                // Если игра не была на паузе — поставим её на тихую паузу (без оверлея)
+                if (!this._wasGamePausedBeforeModal) {
+                    this.eventBus.emit('game:pause', { silent: true });
+                }
+            }
+        });
+
+        this.eventBus.on('ui:modal:close', () => {
+            this._uiModalCount = Math.max(0, (this._uiModalCount || 0) - 1);
+            console.debug('App: modal closed, count=', this._uiModalCount);
+            if (this._uiModalCount === 0) {
+                // Если перед открытием модалки игра была на паузе — восстановим оверлей паузы
+                if (this._wasGamePausedBeforeModal) {
+                    this.eventBus.emit('game:pause'); // non-silent → покажет PauseScreen
+                } else {
+                    this.eventBus.emit('game:resume');
+                }
+                this._wasGamePausedBeforeModal = false;
+            }
+        });    }
 }

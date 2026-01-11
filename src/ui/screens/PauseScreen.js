@@ -81,13 +81,53 @@ export default class PauseScreen {
         this.menuBtn?.addEventListener('click', () => this.toMenu());
 
         // События из EventBus
+        // При получении запроса на паузу — откладываем показ overlay на небольшую задержку.
+        // Это предотвращает мерцание паузы при быстром открытии/закрытии модалок и случайных нажатиях пробела.
+        this._showTimeout = null;
+        this._showDelayMs = 180; // можно тонко подобрать
+
         this.eventBus.on('game:pause', (data) => {
             this.updateStats(data);
-            this.show();
+
+            // Если пауза 'тихая' (например, инициирована модалкой), не показываем overlay
+            if (data && data.silent) {
+                return;
+            }
+
+            // Если уже открыт UI-слой — не будем показывать overlay
+            if (this.app && this.app._uiModalCount > 0) {
+                return;
+            }
+
+            // Отложенный показ: если за это время откроется модалка или придёт resume — отменим
+            this.cancelPendingShow();
+            this._showTimeout = setTimeout(() => {
+                // Дополнительная проверка перед показом
+                if (this.app && this.app._uiModalCount > 0) return;
+                this.showImmediate();
+            }, this._showDelayMs);
         });
 
+        // При резюме — отменяем отложенный показ и скрываем overlay
         this.eventBus.on('game:resume', () => {
+            this.cancelPendingShow();
             this.hide();
+        });
+
+        // Когда открывается модалка — прячем оверлей паузы и отменяем отложенный показ
+        this.eventBus.on('pause:hideOverlay', () => {
+            this.cancelPendingShow();
+            this.hide();
+        });
+
+        // Также при открытии/закрытии любых модалок отменяем/скрываем оверлей
+        this.eventBus.on('ui:modal:open', () => {
+            this.cancelPendingShow();
+            this.hide();
+        });
+
+        this.eventBus.on('ui:modal:close', () => {
+            // ничего дополнительного — логика восстановления находится в App
         });
 
         // Управление клавишами
@@ -120,8 +160,12 @@ export default class PauseScreen {
         if (levelEl) levelEl.textContent = data.level || 1;
     }
 
-    show() {
+    // Непосредственный немедленный показ overlay (используется внутренне после задержки)
+    showImmediate() {
         if (this.isVisible) return;
+
+        // Если открыт UI-слой — не показываем
+        if (this.app && this.app._uiModalCount > 0) return;
 
         this.isVisible = true;
 
@@ -135,7 +179,16 @@ export default class PauseScreen {
         }
     }
 
+    // Публичный вызов show() оставляем совместимым — просто делегируем на немедленный показ
+    show() {
+        this.cancelPendingShow();
+        this.showImmediate();
+    }
+
     hide() {
+        // Отменяем ожидаемый показ, если он был
+        this.cancelPendingShow();
+
         if (!this.isVisible) return;
 
         this.isVisible = false;
@@ -147,6 +200,13 @@ export default class PauseScreen {
 
         if (this.app.soundService) {
             this.app.soundService.play('menu_close');
+        }
+    }
+
+    cancelPendingShow() {
+        if (this._showTimeout) {
+            clearTimeout(this._showTimeout);
+            this._showTimeout = null;
         }
     }
 

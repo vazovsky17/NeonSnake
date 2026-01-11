@@ -25,6 +25,10 @@ export default class KeyboardControls {
 
     bind() {
         document.addEventListener('keydown', (e) => {
+            // Не реагируем, если фокус в инпуте/селекте/textarea — например, при работе с модалками
+            const active = document.activeElement;
+            if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
+
             if (!this.game.isRunning || this.game.isPaused) return;
 
             const dir = this.keyMap[e.key];
