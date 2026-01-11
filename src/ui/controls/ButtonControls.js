@@ -21,13 +21,13 @@ export default class ButtonControls {
     createButtons() {
         this.container = document.createElement('div');
         this.container.id = 'game-control-buttons';
-        // Добавляем класс для совместимости с глобальным управлением видимостью
+        
         this.container.classList.add('controls');
         this.container.style.position = 'absolute';
         this.container.style.bottom = '20px';
         this.container.style.left = '50%';
         this.container.style.transform = 'translateX(-50%)';
-        // Устанавливаем видимость в соответствии с текущими настройками (если есть)
+        
         const initialShow = window.app?.settings?.showArrows ?? true;
         this.container.style.display = initialShow ? 'flex' : 'none';
         this.container.style.flexDirection = 'column';
@@ -39,19 +39,15 @@ export default class ButtonControls {
 
         const createButton = (dir, iconClass) => {
             const button = document.createElement('button');
-            button.className = 'control-btn';
+            button.classList.add('icon-btn');
             button.innerHTML = `<i class="${iconClass}"></i>`;
             button.style.width = buttonSize;
             button.style.height = buttonSize;
-            button.style.background = 'rgba(255, 255, 255, 0.1)';
-            button.style.border = '1px solid var(--neon-blue)';
-            button.style.color = 'var(--neon-cyan)';
             button.style.fontSize = '24px';
             button.style.fontFamily = 'Orbitron, sans-serif';
-            button.style.borderRadius = '15px'; // Квадратные кнопки со скруглёнными углами
+            button.style.borderRadius = '15px'; 
             button.style.cursor = 'pointer';
             button.style.backdropFilter = 'blur(5px)';
-            button.style.boxShadow = '0 0 10px var(--neon-blue)';
             button.style.transition = 'all 0.2s ease';
             button.style.display = 'flex';
             button.style.justifyContent = 'center';
@@ -59,11 +55,11 @@ export default class ButtonControls {
 
             button.addEventListener('touchstart', () => {
                 button.style.background = 'var(--neon-blue)';
-                button.style.color = '#000';
+                button.style.color = 'var(--dark-bg)';
                 button.style.transform = 'scale(0.95)';
             });
             button.addEventListener('touchend', () => {
-                button.style.background = 'rgba(255, 255, 255, 0.1)';
+                button.style.background = 'var(--btn-bg)';
                 button.style.color = 'var(--neon-cyan)';
                 button.style.transform = 'scale(1)';
             });
@@ -99,7 +95,6 @@ export default class ButtonControls {
         this.canvas.parentNode.appendChild(this.container);
     }
 
-    // Чтобы можно было убрать (например, при hide)
     remove() {
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);

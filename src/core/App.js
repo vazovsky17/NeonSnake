@@ -186,6 +186,21 @@ export default class App {
         this.eventBus.on('game:pause', () => { this._isGamePaused = true; });
         this.eventBus.on('game:resume', () => { this._isGamePaused = false; });
 
+        // При смене темы — обновляем цвет в Telegram WebApp (если доступно)
+        this.eventBus.on('theme:changed', (payload) => {
+            const gridBg = getComputedStyle(document.documentElement).getPropertyValue('--grid-bg').trim();
+            console.debug('App: theme changed', payload, 'gridBg=', gridBg);
+            const tg = window.Telegram?.WebApp;
+            if (tg) {
+                try {
+                    tg.setHeaderColor(gridBg);
+                    tg.setBackgroundColor(gridBg);
+                } catch (e) {
+                    console.warn('Failed to set Telegram theme colors', e);
+                }
+            }
+        });
+
         // Управление состоянием паузы при открытии/закрытии модалок/полноэкранных UI
         this.eventBus.on('ui:modal:open', () => {
             this._uiModalCount = (this._uiModalCount || 0) + 1;

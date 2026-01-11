@@ -16,14 +16,14 @@
     align-items: center;
     padding: 12px 20px;
     flex: 1;
-    border: 1px solid rgba(0, 255, 255, 0.3);
+    border: 1px solid var(--card-border);
     border-radius: 8px;
     color: var(--neon-green);
-    background-color: rgba(0, 20, 20, 0.5);
+    background-color: var(--card-bg);
     backdrop-filter: blur(4px);
     font-size: 16px;
     font-weight: bold;
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.1);
+    box-shadow: 0 0 8px var(--accent-glow);
     text-shadow: 0 0 5px var(--neon-green);
 }
 
@@ -35,16 +35,16 @@
 }
 
 /* Растянуть карточки в stats-row равномерно */
-.stats-row > .ui-card {
+.stats-row>.ui-card {
     flex: 1;
     min-width: 0;
 }
 
 .progress-container {
     padding: 12px 20px;
-    background-color: rgba(0, 20, 20, 0.5);
+    background-color: var(--card-bg);
     border-radius: 8px;
-    border: 1px solid rgba(0, 255, 255, 0.3);
+    border: 1px solid var(--card-border);
     display: flex;
     align-items: center;
     gap: 16px;
@@ -74,14 +74,14 @@
     min-width: 0;
     justify-content: flex-start;
     border-radius: 8px;
-    border: 1px solid rgba(0, 255, 255, 0.2);
+    border: 1px solid var(--card-border);
 }
 
 .progress-container .progress-block {
     flex: 1;
     min-width: 4px;
     height: 8px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--card-bg);
     transition: background-color 0.2s ease;
 }
 
@@ -100,6 +100,9 @@
     height: 100%;
     padding: 20px 5%;
     box-sizing: border-box;
+    background: var(--app-bg, #000000);
+    color: var(--text-color);
+    min-height: 100vh;
 }
 
 #game-ui {
@@ -107,6 +110,16 @@
     padding: 0 !important;
     z-index: 20;
     font-family: Orbitron, monospace;
+    pointer-events: auto;
+}
+
+/* Включаем pointer-events только для интерактивных детей — защитим фоновые элементы */
+#game-ui button,
+#game-ui .icon-btn,
+#game-ui input,
+#game-ui select,
+#game-ui textarea,
+#game-ui .controls {
     pointer-events: auto;
 }
 
@@ -130,19 +143,19 @@
     width: 44px;
     font-size: 20px;
     font-weight: bold;
-    border: 1px solid rgba(0, 255, 255, 0.3);
+    border: 1px solid var(--card-border);
     border-radius: 8px;
-    background: rgba(0, 20, 20, 0.5);
+    background: var(--card-bg);
     color: var(--neon-purple);
     cursor: pointer;
     transition: all 0.18s ease;
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.1);
+    box-shadow: var(--accent-glow, 0 0 8px #00ff00);
 }
 
 .icon-btn:hover {
-    background: rgba(0, 20, 20, 0.3);
+    background: var(--card-bg);
     transform: scale(1.05);
-    box-shadow: 0 0 12px rgba(185, 103, 255, 0.3);
+    box-shadow: 0 0 12px var(--accent-glow, 0 0 12px #00ff00cc);
 }
 
 /* Подстраховка: если игры-контейнеры создаются inline, базовые правила */
@@ -153,13 +166,24 @@
 
 .game-canvas {
     display: block;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--canvas-border);
     border-radius: 12px;
     background: var(--grid-bg);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+    box-shadow: 0 0 20px var(--accent-glow);
     image-rendering: pixelated;
     max-width: 100%;
     height: auto;
     margin-left: auto;
     margin-right: auto;
+}
+
+#game-control-buttons .icon-btn {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    font-size: 24px;
+}
+
+#game-control-buttons .icon-btn i {
+    font-size: 1.2em;
 }

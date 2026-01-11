@@ -5,8 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
-        window.Telegram.WebApp.setHeaderColor('#0a0e27');
-        window.Telegram.WebApp.setBackgroundColor('#0a0e27');
+        // Try to pick a color from the current theme so Telegram UI matches
+        const themeBg = getComputedStyle(document.documentElement).getPropertyValue('--grid-bg').trim() || '#0a0e27';
+        window.Telegram.WebApp.setHeaderColor(themeBg);
+        window.Telegram.WebApp.setBackgroundColor(themeBg);
     }
 
     // Загружаем приложение в любом случае

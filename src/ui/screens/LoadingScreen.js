@@ -28,7 +28,7 @@ export default class LoadingScreen {
         el.className = 'modal'; // ← теперь как все экраны
         el.innerHTML = `
             <div class="modal-content">
-                <h2 class="modal-title">NEURAL CORE v9.7</h2>
+                <h2 class="modal-title">Neon Snake</h2>
 
                 <div class="loading-bar-container">
                     <div class="loading-bar-fill"></div>

@@ -13,7 +13,7 @@
     /* Модалки должны быть поверх всего */
     z-index: 9999;
     backdrop-filter: blur(8px);
-    background: rgba(10, 14, 39, 0.95);
+    background: var(--overlay-bg);
 }
 
 .modal.show {
@@ -34,7 +34,7 @@
     /* Должны быть ниже модалок */
     z-index: 900;
     backdrop-filter: blur(6px);
-    background: rgba(10, 14, 39, 0.9);
+    background: var(--overlay-bg);
 }
 
 .screen.show {
@@ -50,13 +50,13 @@
     padding: 40px;
     text-align: center;
 
-    /* Неоновая обводка */
-    border: 2px solid var(--neon-cyan);
+    /* Обводка и тень подчиняются теме */
+    border: 2px solid var(--card-border);
     border-radius: 12px;
-    box-shadow: 0 0 30px var(--neon-cyan);
+    box-shadow: 0 0 30px var(--accent-glow);
 
     /* Эффект стекла */
-    background: rgba(10, 14, 39, 0.95);
+    background: var(--overlay-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
 
@@ -100,11 +100,11 @@
     display: flex;
     justify-content: space-between;
     padding: 6px 0;
-    border-bottom: 1px dashed rgba(100, 200, 255, 0.3);
+    border-bottom: 1px dashed var(--card-border);
 }
 
 .stat-line:first-child {
-    border-top: 1px dashed rgba(100, 200, 255, 0.3);
+    border-top: 1px dashed var(--card-border);
 }
 
 .label {
@@ -123,7 +123,8 @@
     margin-top: 20px;
     font-family: 'Courier New', monospace;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-color);
+    opacity: 0.8;
     text-align: center;
 }
 
@@ -135,7 +136,8 @@
 .modal-footer {
     margin-top: 32px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-color);
+    opacity: 0.7;
     text-align: center;
     font-family: 'Courier New', monospace;
 }
@@ -193,7 +195,7 @@
     text-transform: uppercase;
     letter-spacing: 1px;
 
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--card-bg);
     color: var(--neon-cyan);
     border: 1px solid var(--neon-cyan);
     border-radius: 8px;
@@ -205,8 +207,8 @@
 
     backdrop-filter: blur(4px);
     box-shadow:
-        0 0 10px rgba(0, 255, 255, 0.2),
-        inset 0 0 10px rgba(0, 255, 255, 0.1);
+        0 0 10px var(--accent-glow),
+        inset 0 0 10px var(--accent-glow);
     transition: all 0.3s ease;
 }
 
@@ -220,9 +222,9 @@
     bottom: 0;
     background: linear-gradient(45deg,
             transparent,
-            rgba(0, 255, 255, 0.1),
+            var(--accent-glow),
             transparent,
-            rgba(0, 255, 255, 0.1));
+            var(--accent-glow));
     transform: translateX(-100%);
     transition: transform 0.6s ease;
     pointer-events: none;
@@ -239,8 +241,8 @@
     color: var(--neon-green);
     text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
     box-shadow:
-        0 0 20px rgba(0, 255, 255, 0.5),
-        inset 0 0 15px rgba(0, 255, 255, 0.3);
+        0 0 20px var(--accent-glow),
+        inset 0 0 15px var(--accent-glow);
     border-color: var(--neon-green);
     transform: translateY(-1px);
 }
@@ -286,12 +288,12 @@
     font-weight: 600;
     padding: 12px 24px;
     border-radius: 12px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 20px var(--shadow-muted);
     z-index: 1000;
     display: flex;
     align-items: center;
     gap: 8px;
-    color: white;
+    color: var(--text-color);
     backdrop-filter: blur(8px);
     opacity: 0;
     visibility: hidden;
@@ -304,19 +306,19 @@
 }
 
 .snackbar.success {
-    background: rgba(34, 150, 85, 0.95);
-    border: 1px solid rgba(76, 255, 171, 0.3);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
 }
 
 .snackbar.info {
-    background: rgba(33, 150, 243, 0.95);
-    border: 1px solid rgba(67, 201, 249, 0.3);
+    background: var(--info-bg);
+    border: 1px solid var(--info-border);
 }
 
 .snackbar.error {
-    background: rgba(244, 67, 54, 0.95);
-    border: 1px solid rgba(255, 100, 100, 0.3);
-}
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+} 
 
 /* === UI-КАРТОЧКИ (в игре) === */
 #game-ui {
@@ -340,15 +342,15 @@
     align-items: center;
     justify-content: center;
     padding: 6px 12px;
-    border: 1px solid rgba(0, 255, 255, 0.3);
+    border: 1px solid var(--card-border);
     border-radius: 8px;
     color: var(--neon-cyan);
-    background: rgba(0, 20, 20, 0.5);
+    background: var(--card-bg);
     backdrop-filter: blur(4px);
     font-size: 14px;
     min-width: 60px;
     text-align: center;
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.1);
+    box-shadow: 0 0 8px var(--accent-glow);
 }
 
 /* === БЕЙДЖ (рекорд, ачивка) === */
@@ -361,22 +363,22 @@
     font-size: 14px;
     font-weight: 700;
     color: var(--neon-cyan);
-    background: rgba(0, 245, 255, 0.1);
+    background: var(--accent-glow);
     border: 1px solid var(--neon-cyan);
     border-radius: 8px;
     padding: 8px 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+    text-shadow: 0 0 10px var(--neon-cyan);
     animation: glowPulse 2s ease-in-out infinite alternate;
 }
 
 @keyframes glowPulse {
     from {
-        text-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+        text-shadow: 0 0 10px var(--neon-cyan);
     }
 
     to {
-        text-shadow: 0 0 20px rgba(0, 245, 255, 0.8);
+        text-shadow: 0 0 20px var(--neon-cyan);
     }
 }

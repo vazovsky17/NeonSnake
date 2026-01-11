@@ -36,11 +36,11 @@ export default class SettingsScreen {
             <div class="settings-container" style="
                 width: 90%;
                 max-width: 400px;
-                background: rgba(10, 14, 39, 0.95);
-                border: 1px solid rgba(0, 245, 255, 0.3);
+                background: var(--overlay-bg);
+                border: 1px solid var(--card-border);
                 border-radius: 16px;
                 padding: 24px;
-                box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+                box-shadow: 0 0 30px var(--accent-glow);
                 font-family: 'Orbitron', monospace;
                 color: var(--neon-cyan);
                 backdrop-filter: blur(10px);
@@ -66,11 +66,11 @@ export default class SettingsScreen {
                         padding: 10px;
                         border: 1px solid var(--neon-cyan);
                         border-radius: 8px;
-                        background: rgba(0, 20, 20, 0.5);
+                        background: var(--card-bg);
                         color: var(--neon-cyan);
                         font-family: inherit;
                         outline: none;
-                        box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+                        box-shadow: 0 0 5px var(--accent-glow);
                     ">
                         <option value="neon">Neon</option>
                         <option value="cyberpunk">Cyberpunk</option>
@@ -139,7 +139,7 @@ export default class SettingsScreen {
                 <button type="button" name="close" style="
                     width: 100%;
                     padding: 12px;
-                    background: rgba(0, 255, 255, 0.1);
+                    background: var(--accent-glow);
                     border: 1px solid var(--neon-cyan);
                     border-radius: 8px;
                     color: var(--neon-cyan);

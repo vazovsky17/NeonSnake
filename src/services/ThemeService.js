@@ -11,7 +11,6 @@
 export default class ThemeService {
     /**
      * Доступные темы
-     * Можно расширить: 'retro', 'matrix', 'dark'
      */
     static THEMES = ['neon', 'cyberpunk', 'dark', 'matrix'];
 
@@ -43,6 +42,7 @@ export default class ThemeService {
         }
 
         // Меняем атрибут
+        const prev = document.documentElement.getAttribute('data-theme');
         document.documentElement.setAttribute('data-theme', theme);
 
         // Сохраняем
@@ -62,6 +62,7 @@ export default class ThemeService {
         // Haptic feedback (если включено)
         this.triggerHaptic();
 
+        console.debug('[ThemeService] apply()', { from: prev, to: theme });
         console.log(`🎨 Тема изменена: ${oldTheme} → ${theme}`);
         return true;
     }

@@ -31,6 +31,27 @@
 
     /* Шум (noise) — как на CRT-экране */
     --noise-bg: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+
+    /* UI: overlay, cards, borders — меняются вместе с темой */
+    --overlay-bg: rgba(10, 14, 39, 0.95);
+    --card-bg: rgba(0, 20, 20, 0.5);
+    --card-border: rgba(0, 255, 255, 0.3);
+    --canvas-border: rgba(255, 255, 255, 0.1);
+    --accent-glow: rgba(0, 245, 255, 0.1);
+    --progress-empty: rgba(255, 255, 255, 0.06);
+
+    /* Semantic colors */
+    --success-bg: rgba(34, 150, 85, 0.95);
+    --success-border: rgba(76, 255, 171, 0.3);
+
+    --info-bg: rgba(33, 150, 243, 0.95);
+    --info-border: rgba(67, 201, 249, 0.3);
+
+    --danger-bg: rgba(244, 67, 54, 0.95);
+    --danger-border: rgba(255, 100, 100, 0.3);
+
+    --shadow-muted: rgba(0, 0, 0, 0.2);
+    --accent-glow: 0 0 8px rgba(0, 245, 255, 0.3);
 }
 
 /* === Темы === */
@@ -43,6 +64,11 @@
     --grid-bg: #001a00;
     --text-color: var(--neon-green);
     --btn-primary: var(--neon-green);
+
+    --overlay-bg: rgba(1, 12, 3, 0.95);
+    --card-bg: rgba(0, 10, 0, 0.45);
+    --card-border: rgba(0, 255, 65, 0.28);
+    --accent-glow: 0 0 8px rgba(0, 255, 65, 0.3);
 }
 
 [data-theme="sunset"] {
@@ -54,6 +80,11 @@
     --grid-bg: #2d1b20;
     --text-color: var(--neon-pink);
     --btn-primary: var(--neon-pink);
+
+    --overlay-bg: rgba(26, 10, 15, 0.95);
+    --card-bg: rgba(45, 27, 32, 0.45);
+    --card-border: rgba(255, 107, 53, 0.28);
+    --accent-glow: 0 0 8px rgba(255, 107, 53, 0.3);
 }
 
 [data-theme="ocean"] {
@@ -65,6 +96,11 @@
     --grid-bg: #0b132b;
     --text-color: var(--neon-blue);
     --btn-primary: var(--neon-blue);
+
+    --overlay-bg: rgba(2, 6, 94, 0.95);
+    --card-bg: rgba(11, 19, 43, 0.45);
+    --card-border: rgba(67, 97, 238, 0.28);
+    --accent-glow: 0 0 8px rgba(67, 97, 238, 0.3);
 }
 
 [data-theme="retro"] {
@@ -76,6 +112,11 @@
     --grid-bg: #3d1152;
     --text-color: var(--neon-pink);
     --btn-primary: var(--neon-pink);
+
+    --overlay-bg: rgba(43, 10, 61, 0.95);
+    --card-bg: rgba(61, 17, 82, 0.45);
+    --card-border: rgba(255, 0, 110, 0.28);
+    --accent-glow: 0 0 8px rgba(255, 0, 110, 0.3);
 }
 
 [data-theme="toxic"] {
@@ -87,6 +128,61 @@
     --grid-bg: #1a2e1a;
     --text-color: var(--neon-green);
     --btn-primary: var(--neon-green);
+
+    --overlay-bg: rgba(10, 30, 10, 0.95);
+    --card-bg: rgba(26, 46, 26, 0.45);
+    --card-border: rgba(204, 255, 0, 0.28);
+    --accent-glow: 0 0 8px rgba(204, 255, 0, 0.3);
+}
+
+/* === Совместимость с доступными темами приложения === */
+[data-theme="cyberpunk"] {
+    /* Используем базовые значения (как :root) — яркие контрасты */
+    --neon-pink: #ff006e;
+    --neon-cyan: #00f5ff;
+    --neon-purple: #b967ff;
+    --neon-green: #0aff00;
+    --dark-bg: #060914;
+    --grid-bg: #0a0e27;
+    --text-color: var(--neon-cyan);
+    --btn-primary: var(--neon-green);
+
+    --overlay-bg: rgba(10, 14, 39, 0.95);
+    --card-bg: rgba(0, 20, 20, 0.5);
+    --card-border: rgba(0, 245, 255, 0.25);
+    --accent-glow: 0 0 8px rgba(0, 229, 255, 0.3);
+}
+
+[data-theme="neon"] {
+    --neon-pink: #ff4dd2;
+    --neon-cyan: #00e5ff;
+    --neon-purple: #a855f7;
+    --neon-green: #39ff14;
+    --dark-bg: #050518;
+    --grid-bg: #07102a;
+    --text-color: var(--neon-cyan);
+    --btn-primary: var(--neon-cyan);
+
+    --overlay-bg: rgba(5, 5, 24, 0.95);
+    --card-bg: rgba(7, 16, 42, 0.5);
+    --card-border: rgba(0, 229, 255, 0.25);
+    --accent-glow: 0 0 8px rgba(0, 229, 255, 0.3);
+}
+
+[data-theme="dark"] {
+    --neon-pink: #ff6b6b;
+    --neon-cyan: #8bd3ff;
+    --neon-purple: #b39ddb;
+    --neon-green: #7cffb2;
+    --dark-bg: #050505;
+    --grid-bg: #0b0b12;
+    --text-color: #cbd5e1;
+    --btn-primary: var(--neon-green);
+
+    --overlay-bg: rgba(5, 5, 5, 0.95);
+    --card-bg: rgba(10, 10, 10, 0.6);
+    --card-border: rgba(203, 213, 225, 0.12);
+    --accent-glow: 0 0 8px rgba(203, 213, 225, 0.15);
 }
 
 /* === Сброс === */

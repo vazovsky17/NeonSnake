@@ -43,6 +43,9 @@ export default class GameScreen {
         this.resizeCanvas();
         this.setupGame();
         this.bindEvents();
+        // Apply theme to initial DOM
+        this.applyThemeToDom();
+        this.logThemeVars();
         this.startLoop();
     }
 
@@ -336,6 +339,24 @@ export default class GameScreen {
             this.togglePause();
         });
 
+        // Когда тема меняется — обновим UI и перерисуем canvas
+        this.eventBus.on('theme:changed', (payload) => {
+            console.debug('GameScreen: theme changed', payload);
+            try {
+                this.logThemeVars();
+                this.applyThemeToDom();
+                // Обновляем прогресс цвета прямо сейчас
+                const filled = Math.floor((this.game?.getLevelProgress?.()?.value || 0) * 10);
+                this.progressBlocks.forEach((block, i) => {
+                    block.style.backgroundColor = i < filled ? 'var(--neon-green)' : 'var(--progress-empty)';
+                });
+                // Немедленно перерисуем
+                this.draw();
+            } catch (e) {
+                console.warn('Error applying theme in GameScreen', e);
+            }
+        });
+
         // Обновление иконки кнопки паузы при изменении состояния игры
         this.eventBus.on('game:pause', () => {
             if (this.pauseButton) {
@@ -382,7 +403,7 @@ export default class GameScreen {
         this.progressBlocks.forEach((block, i) => {
             block.style.backgroundColor = i < filled
                 ? 'var(--neon-green)'
-                : 'rgba(255, 255, 255, 0.1)';
+                : 'var(--progress-empty)';
         });
         this.progressValue.textContent = progress.label;
     }
@@ -616,7 +637,7 @@ export default class GameScreen {
         const food = game.food;
 
         const neonGreen = this.getCssVariable('--neon-green');
-        const white = '#fff';
+        const textColor = this.getCssVariable('--text-color') || '#fff';
 
         const x = food.x * cellSize + cellSize / 2;
         const y = food.y * cellSize + cellSize / 2;
@@ -631,9 +652,9 @@ export default class GameScreen {
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Центр — белая точка
+        // Центр — точка в цвете текста темы
         ctx.shadowBlur = 0;
-        ctx.fillStyle = white;
+        ctx.fillStyle = textColor;
         ctx.beginPath();
         ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
         ctx.fill();
@@ -671,10 +692,9 @@ export default class GameScreen {
     drawHead(x, y, size, direction) {
         const { ctx } = this;
 
-        const neonPink = this.getCssVariable('--neon-pink');
-        const neonPurple = this.getCssVariable('--neon-purple');
+        const neonPink = this.getCssVariable('--neon-pink', '#ff1493');
+        const neonPurple = this.getCssVariable('--neon-purple', '#bf00ff');
 
-        // Радиальный градиент (как в старом коде)
         const gradient = ctx.createRadialGradient(
             x + size / 2, y + size / 2, 0,
             x + size / 2, y + size / 2, size
@@ -687,14 +707,13 @@ export default class GameScreen {
         const pad = Math.max(2, size * 0.1);
         ctx.fillRect(x + pad, y + pad, size - pad * 2, size - pad * 2);
 
-        // Свечение
         ctx.shadowColor = neonPink;
         ctx.shadowBlur = Math.min(8, size * 0.4);
         ctx.fillRect(x + pad, y + pad, size - pad * 2, size - pad * 2);
         ctx.shadowBlur = 0;
 
-        // Глазки — как у вас, отлично!
-        ctx.fillStyle = 'white';
+        // Глазки
+        ctx.fillStyle = this.getCssVariable('--text-color', '#fff');
         const eyeSize = size * 0.15;
         const eyeOffset = size * 0.3;
 
@@ -729,7 +748,9 @@ export default class GameScreen {
         ctx.fillRect(x + pad, y + pad, segmentSize, segmentSize);
 
         // Свечение
-        ctx.shadowColor = `rgba(0, 245, 253, ${alpha * 0.6})`;
+        const neonCyan = this.getCssVariable('--neon-cyan') || '#00f5ff';
+        const rgb = this.hexToRgb(neonCyan);
+        ctx.shadowColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha * 0.6})` : `rgba(0, 245, 253, ${alpha * 0.6})`;
         ctx.shadowBlur = Math.min(4, size * 0.2);
         ctx.fillRect(x + pad, y + pad, segmentSize, segmentSize);
 
@@ -751,7 +772,22 @@ export default class GameScreen {
 
         const neonGreen = computeColor('--neon-green');
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        const overlayVar = getComputedStyle(document.documentElement).getPropertyValue('--overlay-bg').trim() || 'rgba(0,0,0,0.7)';
+        let overlayColor = overlayVar;
+        if (overlayColor.startsWith('rgba')) {
+            // Replace alpha with 0.7 to make pause overlay slightly translucent
+            overlayColor = overlayColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (m, r, g, b) => `rgba(${r.trim()}, ${g.trim()}, ${b.trim()}, 0.7)`);
+        } else if (overlayColor.startsWith('#')) {
+            // Convert hex to rgba
+            const hex = overlayColor.replace('#','');
+            const bigint = parseInt(hex.length === 3 ? hex.split('').map(c=>c+c).join('') : hex, 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            overlayColor = `rgba(${r}, ${g}, ${b}, 0.7)`;
+        }
+
+        ctx.fillStyle = overlayColor;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         ctx.font = `bold ${this.cellSize * 1.5}px Orbitron`;
@@ -827,5 +863,85 @@ export default class GameScreen {
 
     getCssVariable(name) {
         return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    hexToRgb(hex) {
+        if (!hex) return null;
+        const h = hex.replace('#','').trim();
+        const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+        const num = parseInt(full, 16);
+        if (Number.isNaN(num)) return null;
+        return {
+            r: (num >> 16) & 255,
+            g: (num >> 8) & 255,
+            b: num & 255
+        };
+    }
+
+    logThemeVars() {
+        const keys = ['--grid-bg','--neon-blue','--neon-green','--neon-cyan','--neon-pink','--text-color','--overlay-bg','--card-bg','--card-border','--accent-glow','--canvas-border'];
+        const out = {};
+        keys.forEach(k => {
+            try { out[k] = this.getCssVariable(k); } catch (e) { out[k] = '(error)'; }
+        });
+        console.debug('GameScreen theme vars:', out);
+    }
+
+    applyThemeToDom() {
+        // Применяем переменные темы к существующим DOM-элементам, чтобы сразу увидеть изменения
+        try {
+            // Header
+            if (this.headerContainer) {
+                const headerCard = this.headerContainer.querySelector('.header-card');
+                if (headerCard) {
+                    headerCard.style.background = 'var(--card-bg)';
+                    headerCard.style.borderColor = 'var(--card-border)';
+                    headerCard.style.boxShadow = '0 0 8px var(--accent-glow)';
+                    headerCard.style.color = 'var(--neon-green)';
+                }
+            }
+
+            // Score/title
+            if (this.title) this.title.style.color = 'var(--neon-pink)';
+            if (this.scoreLabel) this.scoreLabel.style.color = 'var(--neon-cyan)';
+
+            // UI cards
+            [this.levelCard, this.speedCard, this.bestCard].forEach(el => {
+                if (!el) return;
+                el.style.background = 'var(--card-bg)';
+                el.style.border = '1px solid var(--card-border)';
+                el.style.boxShadow = '0 0 8px var(--accent-glow)';
+                el.style.color = 'var(--neon-cyan)';
+            });
+
+            // Progress bar wrapper
+            if (this.progressContainer) {
+                this.progressContainer.style.background = 'var(--card-bg)';
+                this.progressContainer.style.border = '1px solid var(--card-border)';
+            }
+
+            // Pause button styling
+            if (this.pauseButton) {
+                this.pauseButton.style.background = 'var(--card-bg)';
+                this.pauseButton.style.border = '1px solid var(--card-border)';
+                this.pauseButton.style.boxShadow = '0 0 8px var(--accent-glow)';
+                this.pauseButton.style.color = 'var(--neon-purple)';
+            }
+
+            // Controls container
+            const controls = document.querySelectorAll('#game-control-buttons, .controls');
+            controls.forEach(c => {
+                c.style.background = 'transparent';
+            });
+
+            // Canvas border color
+            if (this.canvas) {
+                this.canvas.style.borderColor = 'var(--canvas-border)';
+            }
+
+            console.debug('GameScreen: applied theme to DOM');
+        } catch (e) {
+            console.warn('applyThemeToDom failed', e);
+        }
     }
 }
