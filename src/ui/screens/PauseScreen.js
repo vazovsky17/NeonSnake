@@ -62,11 +62,10 @@ export default class PauseScreen {
                 <div class="btn-group">
                     <button id="pauseResume" class="hacker-btn">RESUME</button>
                     <button id="pauseRestart" class="hacker-btn">RESTART</button>
-                    <button id="pauseMenu" class="hacker-btn">MAIN MENU</button>
                 </div>
 
                 <div class="modal-hint">
-                    <small>ESC • P: Resume | R: Restart | M: Menu</small>
+                    <small>ESC • P: Resume | R: Restart</small>
                 </div>
                 
                 <div class="modal-footer">
@@ -147,10 +146,6 @@ export default class PauseScreen {
                     e.preventDefault();
                     this.restart();
                     break;
-                case 'KeyM':
-                    e.preventDefault();
-                    this.toMenu();
-                    break;
             }
         });
     }
@@ -219,11 +214,6 @@ export default class PauseScreen {
 
     restart() {
         this.eventBus.emit('game:restart');
-        this.hide();
-    }
-
-    toMenu() {
-        this.eventBus.emit('game:menu');
         this.hide();
     }
 }

@@ -64,13 +64,12 @@ export default class GameOverScreen {
 
                 <div class="btn-group">
                     <button id="gameOverRestart" class="hacker-btn">PLAY AGAIN</button>
-                    <button id="gameOverMenu" class="hacker-btn">MAIN MENU</button>
                     <button id="gameOverLeaderboard" class="hacker-btn">LEADERBOARD</button>
                     <button id="gameOverShare" class="hacker-btn">SHARE</button>
                 </div>
 
                 <div class="modal-hint">
-                    <small>ENTER: Play | ESC: Menu | L: Leaderboard | S: Share</small>
+                    <small>ENTER: Play | L: Leaderboard | S: Share</small>
                 </div>
 
                 <div class="modal-footer">
@@ -107,10 +106,6 @@ export default class GameOverScreen {
                 case ' ':
                     e.preventDefault();
                     this.restart();
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    this.toMenu();
                     break;
                 case 'KeyL':
                     e.preventDefault();
@@ -171,11 +166,6 @@ export default class GameOverScreen {
         this.hide();
         this.eventBus.emit('game:restart');
         this.eventBus.emit('game:start');
-    }
-
-    toMenu() {
-        this.hide();
-        this.eventBus.emit('game:menu');
     }
 
     toLeaderboard() {
